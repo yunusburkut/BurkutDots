@@ -3,33 +3,39 @@ using UnityEngine;
 
 [UpdateInGroup(typeof(PresentationSystemGroup))]
 public partial class TileSpriteSystem : SystemBase
-{
+{ private bool hasRunOnce = false;
+
     protected override void OnUpdate()
     {
-        // SpriteArrayComponent'e eriş
-        var spriteEntity = GetSingletonEntity<SpriteArrayComponent>();
-        var spriteArray = EntityManager.GetComponentObject<SpriteArrayComponent>(spriteEntity);
-
-        if (spriteArray == null || spriteArray.mappings[0].Sprites.Length == 0)
+        if (hasRunOnce)
         {
-            Debug.LogError("SpriteArrayComponent içinde sprite yok!");
-            return;
-        }
+            // SpriteArrayComponent'e eriş
+            var spriteEntity = GetSingletonEntity<SpriteArrayComponent>();
+            var spriteArray = EntityManager.GetComponentObject<SpriteArrayComponent>(spriteEntity);
 
-        // Her TileEntity için SpriteRenderer'ı güncelle
-        Entities
-            .WithAll<TileData>()
-            .ForEach((SpriteRenderer spriteRenderer, in TileData tileData) =>
+            if (spriteArray == null || spriteArray.mappings[0].Sprites.Length == 0)
             {
-                // ColorIndex'in geçerli olup olmadığını kontrol et
-                if (tileData.ColorIndex >= 0 && tileData.ColorIndex < spriteArray.mappings.Count)
+                Debug.LogError("SpriteArrayComponent içinde sprite yok!");
+                return;
+            }
+
+            // Her TileEntity için SpriteRenderer'ı güncelle
+            Entities
+                .WithAll<TileData>()
+                .ForEach((SpriteRenderer spriteRenderer, in TileData tileData) =>
                 {
-                    spriteRenderer.sprite = spriteArray.mappings[tileData.ColorIndex].Sprites[0];
-                }
-                else
-                {
-                    Debug.LogError($"Geçersiz ColorIndex: {tileData.ColorIndex}");
-                }
-            }).WithoutBurst().Run();
+                    // ColorIndex'in geçerli olup olmadığını kontrol et
+                    if (tileData.ColorIndex >= 0 && tileData.ColorIndex < spriteArray.mappings.Count)
+                    {
+                        spriteRenderer.sprite = spriteArray.mappings[tileData.ColorIndex].Sprites[0];
+                    }
+                    else
+                    {
+                        Debug.LogError($"Geçersiz ColorIndex: {tileData.ColorIndex}");
+                    }
+                }).WithoutBurst().Run();
+            hasRunOnce = true;
+        }
+        
     }
 }

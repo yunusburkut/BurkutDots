@@ -13,9 +13,8 @@ public partial class BlastGroupSystem : SystemBase
 
         // Mouse pozisyonunu al ve dünya koordinatlarına çevir
         Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        Debug.Log($"Lokasyon: {worldPos}");
         int2 gridPosition = new int2((int)math.floor(worldPos.x), (int)math.floor(worldPos.y));
-      //  Debug.Log($"Lokasyon: {gridPosition}");
+     
         // Seçilen hücreye ait grubu bulun
         NativeList<Entity> groupEntities = FindGroupEntities(gridPosition);
 
@@ -24,7 +23,7 @@ public partial class BlastGroupSystem : SystemBase
         {
             foreach (var entity in groupEntities)
             {
-                Debug.Log($"Patlatılan Entity: {entity}");
+                
                 EntityManager.DestroyEntity(entity);
             }
         }

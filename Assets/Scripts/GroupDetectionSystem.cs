@@ -6,29 +6,50 @@ using UnityEngine;
 
 public partial class GroupDetectionSystem : SystemBase
 {
+    private SpriteArrayAuthoring colorSpriteManager;
+    private bool hasRun = false; // Sistem sadece bir kez çalışacak
+
+    protected override void OnStartRunning()
+    {
+        // SpriteArrayAuthoring'i sahneden bulun
+        colorSpriteManager = Object.FindObjectOfType<SpriteArrayAuthoring>();
+
+        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
+        {
+            Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
+        }
+    }
+
     protected override void OnUpdate()
     {
-        
+        if (hasRun) return; // Sistem sadece bir kez çalışır
+        hasRun = true;
+
+        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
+        {
+            Debug.LogError("ColorSpriteManager eksik!");
+            return;
+        }
+
         int rows = 10;       // Tahta boyutları
         int columns = 10;    // Tahta boyutları
+        int totalCells = rows * columns;
 
         // Entity'lerin listesi
-        var entities = EntityManager.GetAllEntities(Unity.Collections.Allocator.Temp);
-        var grid = new NativeArray<int>(rows * columns, Allocator.TempJob); // Renk bilgisi
-        var visited = new NativeArray<bool>(rows * columns, Allocator.TempJob); // Ziyaret bilgisi
+        var entities = EntityManager.GetAllEntities(Allocator.Temp);
+        var grid = new NativeArray<int>(totalCells, Allocator.TempJob); // Renk bilgisi
+        var visited = new NativeArray<bool>(totalCells, Allocator.TempJob); // Ziyaret bilgisi
 
-        // Entity'lerden renk bilgisi al
-        for (int i = 0; i < entities.Length; i++)
+        // Grid'i doldur
+        foreach (var entity in entities)
         {
-            if (EntityManager.HasComponent<TileData>(entities[i]))
+            if (EntityManager.HasComponent<TileData>(entity) && EntityManager.HasComponent<LocalTransform>(entity))
             {
-                var tileData = EntityManager.GetComponentData<TileData>(entities[i]);
+                var tileData = EntityManager.GetComponentData<TileData>(entity);
+                var transform = EntityManager.GetComponentData<LocalTransform>(entity);
 
-                // Pozisyon hesapla (satır/sütun pozisyonuna göre)
-                var transform = EntityManager.GetComponentData<LocalTransform>(entities[i]);
                 int row = (int)math.round(transform.Position.y);
                 int col = (int)math.round(transform.Position.x);
-
                 int index = row * columns + col;
 
                 if (index >= 0 && index < grid.Length)
@@ -38,78 +59,138 @@ public partial class GroupDetectionSystem : SystemBase
             }
         }
 
-        // Grupları tespit etmek için Flood Fill
-        NativeList<int2> groupPositions = new NativeList<int2>(Allocator.TempJob);
-        NativeList<int> groupColors = new NativeList<int>(Allocator.TempJob);
-
-        for (int i = 0; i < rows; i++)
+        // Tek for döngüsü ile grup tespiti ve işleme
+        for (int index = 0; index < totalCells; index++)
         {
-            for (int j = 0; j < columns; j++)
+            if (visited[index] || grid[index] < 0)
+                continue; // Zaten ziyaret edilmiş veya geçerli bir renk değil
+
+            var group = new NativeList<int>(Allocator.Temp); // Grup üyelerini saklar
+            int currentColor = grid[index];
+
+            // Flood Fill benzeri işlem
+            FindGroup(index, rows, columns, grid, visited, currentColor, group);
+
+            // Grup 2'den büyükse işleme devam edin
+            
+            // Grup için uygun sprite seçimi
+            Sprite selectedSprite = GetSpriteForGroupSize(group.Length, currentColor);
+
+            // Grup içindeki tüm tile'ların sprite'ını değiştir
+            foreach (int cellIndex in group)
             {
-                int index = i * columns + j;
+                float3 position = new float3(cellIndex % columns, cellIndex / columns, 0);
 
-                // Ziyaret edilmemiş ve geçerli bir renkse
-                if (!visited[index] && grid[index] >= 0)
+                // Entity'yi bul ve sprite'ı değiştir
+                foreach (var entity in entities)
                 {
-                    // Yeni bir grup oluştur
-                    NativeList<int2> currentGroup = new NativeList<int2>(Allocator.Temp);
-                    FloodFill(i, j, rows, columns, grid, visited, grid[index], currentGroup);
+                    if (!EntityManager.HasComponent<LocalTransform>(entity) || !EntityManager.HasComponent<SpriteRenderer>(entity))
+                        continue;
 
-                    // Eğer grup 2 veya daha fazla elemandan oluşuyorsa
-                    if (currentGroup.Length >= 2)
+                    var transform = EntityManager.GetComponentData<LocalTransform>(entity);
+                    if (math.all(transform.Position == position))
                     {
-                        groupPositions.AddRange(currentGroup.AsArray());
-                        groupColors.Add(grid[index]);
+                        var spriteRenderer = EntityManager.GetComponentObject<SpriteRenderer>(entity);
+                        spriteRenderer.sprite = selectedSprite; // Sprite değişimi
                     }
-                    currentGroup.Dispose();
                 }
+            
             }
+            
+
+            group.Dispose();
         }
 
         // Belleği temizle
         entities.Dispose();
         grid.Dispose();
         visited.Dispose();
-        groupPositions.Dispose();
-        groupColors.Dispose();
     }
-    
-    private void FloodFill(
-        int startRow, int startCol,
-        int rows, int columns,
+
+    private void FindGroup(
+        int index,
+        int rows,
+        int columns,
         NativeArray<int> grid,
         NativeArray<bool> visited,
         int color,
-        NativeList<int2> group)
+        NativeList<int> group)
     {
-        NativeQueue<int2> queue = new NativeQueue<int2>(Allocator.Temp);
-        queue.Enqueue(new int2(startRow, startCol));
-        
+        NativeQueue<int> queue = new NativeQueue<int>(Allocator.Temp);
+        queue.Enqueue(index);
+
         while (queue.Count > 0)
         {
-            int2 current = queue.Dequeue();
-            int index = current.x * columns + current.y;
-        
-            if (current.x < 0 || current.x >= rows || current.y < 0 || current.y >= columns)
-                continue; // Sınırların dışında
-        
-            if (visited[index])
-                continue; // Zaten ziyaret edilmiş
-        
-            if (grid[index] != color)
-                continue; // Aynı renk değil
-        
-            // Hücreyi işaretle
-            visited[index] = true;
-            group.Add(current);
-        
+            int currentIndex = queue.Dequeue();
+
+            if (visited[currentIndex])
+                continue;
+
+            visited[currentIndex] = true;
+            group.Add(currentIndex);
+
+            int row = currentIndex / columns;
+            int col = currentIndex % columns;
+
             // Komşuları sıraya ekle
-            queue.Enqueue(new int2(current.x + 1, current.y)); // Aşağı
-            queue.Enqueue(new int2(current.x - 1, current.y)); // Yukarı
-            queue.Enqueue(new int2(current.x, current.y + 1)); // Sağ
-            queue.Enqueue(new int2(current.x, current.y - 1)); // Sol
+            TryAddNeighbor(row - 1, col, rows, columns, currentIndex, grid, visited, color, queue);
+            TryAddNeighbor(row + 1, col, rows, columns, currentIndex, grid, visited, color, queue);
+            TryAddNeighbor(row, col - 1, rows, columns, currentIndex, grid, visited, color, queue);
+            TryAddNeighbor(row, col + 1, rows, columns, currentIndex, grid, visited, color, queue);
         }
-        
+
         queue.Dispose();
     }
-}
+
+    private void TryAddNeighbor(
+        int row,
+        int col,
+        int rows,
+        int columns,
+        int currentIndex,
+        NativeArray<int> grid,
+        NativeArray<bool> visited,
+        int color,
+        NativeQueue<int> queue)
+    {
+        if (row < 0 || row >= rows || col < 0 || col >= columns)
+            return;
+
+        int neighborIndex = row * columns + col;
+
+        if (!visited[neighborIndex] && grid[neighborIndex] == color)
+        {
+            queue.Enqueue(neighborIndex);
+        }
+    }
+
+    private Sprite GetSpriteForGroupSize(int groupSize, int colorIndex)
+    {
+        // Mapping'den ColorID'ye uygun sprite'ı bul
+        foreach (var mapping in colorSpriteManager.mappings)
+        {
+            if (mapping.ColorID == colorIndex)
+            {
+                if (groupSize == 1 && mapping.Sprites.Length > 1)
+                {
+                    return mapping.Sprites[0]; // Grup boyutu 3 için 2. sprite
+                }
+                else if (groupSize == 2 && mapping.Sprites.Length > 2)
+                {
+                    return mapping.Sprites[1]; // Grup boyutu 4 veya daha büyük için 3. sprite
+                }
+                else if (groupSize == 3 && mapping.Sprites.Length > 0)
+                {
+                    return mapping.Sprites[2]; // Varsayılan (grup boyutu 2'den büyük)
+                }
+                else if (groupSize >= 4 && mapping.Sprites.Length > 0)
+                {
+                    return mapping.Sprites[3]; // Varsayılan (grup boyutu 2'den büyük)
+                }
+            }
+        }
+
+        Debug.LogWarning($"Grup boyutu {groupSize} ve renk {colorIndex} için uygun sprite bulunamadı.");
+        return null;
+    }
+} 

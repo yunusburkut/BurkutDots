@@ -22,15 +22,18 @@ public partial class BoardInitializationSystem : SystemBase
         tilePrefab = tilePrefabComponent.PrefabEntity;
         
         CreateBoard();
+        
     }
 
     private void CreateBoard()
     {
+        
         int rows = 10, columns = 10, colorCount = 6;
         var entityManager = EntityManager;
         float xOffset = -(columns / .5f); // Sol tarafa kaydırma
         float yOffset = -(rows / .5f);    // Aşağıya kaydırma
-
+         SpriteArrayAuthoring colorSpriteManager;
+        colorSpriteManager = Object.FindObjectOfType<SpriteArrayAuthoring>();
         for (int row = 0; row < rows; row++)
         {
             for (int col = 0; col < columns; col++)
@@ -54,6 +57,7 @@ public partial class BoardInitializationSystem : SystemBase
                 if (entityManager.HasComponent<SpriteRenderer>(tileEntity))
                 {
                     var spriteRenderer = entityManager.GetComponentObject<SpriteRenderer>(tileEntity);
+                   // spriteRenderer.sprite = colorSpriteManager.mappings[colorIndex].Sprites[0];//ilk spriteyi kullan
                     spriteRenderer.sortingOrder = row; // Satır numarasını sortingOrder olarak kullan
                     Debug.Log($"TileEntity için Sorting Order Ayarlandı: {row}");
                 }
