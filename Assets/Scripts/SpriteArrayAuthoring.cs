@@ -1,9 +1,16 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Unity.Entities;
 
+[System.Serializable]
+public class ColorSpriteArray
+{
+    public int ColorID;         // Renk ID
+    public Sprite[] Sprites;    // Bu renk için kullanılacak sprite dizisi
+}
 public class SpriteArrayAuthoring : MonoBehaviour
 {
-    public Sprite[] Sprites; // Inspector üzerinden atanacak sprite dizisi
+    public List<ColorSpriteArray> mappings; 
 }
 
 public class SpriteArrayBaker : Baker<SpriteArrayAuthoring>
@@ -16,12 +23,12 @@ public class SpriteArrayBaker : Baker<SpriteArrayAuthoring>
         // SpriteArrayComponent'i global bileşen olarak ekle
         AddComponentObject(entity, new SpriteArrayComponent
         {
-            Sprites = authoring.Sprites
+            mappings = authoring.mappings
         });
     }
 }
 
 public class SpriteArrayComponent : IComponentData
 {
-    public Sprite[] Sprites; // Sprite dizisi
+    public List<ColorSpriteArray> mappings; 
 }

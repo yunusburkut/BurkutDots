@@ -84,32 +84,32 @@ public partial class GroupDetectionSystem : SystemBase
     {
         NativeQueue<int2> queue = new NativeQueue<int2>(Allocator.Temp);
         queue.Enqueue(new int2(startRow, startCol));
-
+        
         while (queue.Count > 0)
         {
             int2 current = queue.Dequeue();
             int index = current.x * columns + current.y;
-
+        
             if (current.x < 0 || current.x >= rows || current.y < 0 || current.y >= columns)
                 continue; // Sınırların dışında
-
+        
             if (visited[index])
                 continue; // Zaten ziyaret edilmiş
-
+        
             if (grid[index] != color)
                 continue; // Aynı renk değil
-
+        
             // Hücreyi işaretle
             visited[index] = true;
             group.Add(current);
-
+        
             // Komşuları sıraya ekle
             queue.Enqueue(new int2(current.x + 1, current.y)); // Aşağı
             queue.Enqueue(new int2(current.x - 1, current.y)); // Yukarı
             queue.Enqueue(new int2(current.x, current.y + 1)); // Sağ
             queue.Enqueue(new int2(current.x, current.y - 1)); // Sol
         }
-
+        
         queue.Dispose();
     }
 }

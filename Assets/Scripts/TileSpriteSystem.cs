@@ -10,7 +10,7 @@ public partial class TileSpriteSystem : SystemBase
         var spriteEntity = GetSingletonEntity<SpriteArrayComponent>();
         var spriteArray = EntityManager.GetComponentObject<SpriteArrayComponent>(spriteEntity);
 
-        if (spriteArray == null || spriteArray.Sprites.Length == 0)
+        if (spriteArray == null || spriteArray.mappings[0].Sprites.Length == 0)
         {
             Debug.LogError("SpriteArrayComponent içinde sprite yok!");
             return;
@@ -22,9 +22,9 @@ public partial class TileSpriteSystem : SystemBase
             .ForEach((SpriteRenderer spriteRenderer, in TileData tileData) =>
             {
                 // ColorIndex'in geçerli olup olmadığını kontrol et
-                if (tileData.ColorIndex >= 0 && tileData.ColorIndex < spriteArray.Sprites.Length)
+                if (tileData.ColorIndex >= 0 && tileData.ColorIndex < spriteArray.mappings.Count)
                 {
-                    spriteRenderer.sprite = spriteArray.Sprites[tileData.ColorIndex];
+                    spriteRenderer.sprite = spriteArray.mappings[tileData.ColorIndex].Sprites[0];
                 }
                 else
                 {

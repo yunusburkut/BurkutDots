@@ -193,13 +193,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0359500744c590b4b9ad8d579dcf8415, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Sprites:
-  - {fileID: -8923791490832965560, guid: dac715c47769125438a8a10fcd5f116d, type: 3}
-  - {fileID: 3291406690555587084, guid: 4072eb2eb7ae61048a3c81f6571c6cb1, type: 3}
-  - {fileID: 3519922619171193912, guid: 664d276bbd9ea9b45b5d9f8e6dd49519, type: 3}
-  - {fileID: -6416537123964203564, guid: 10856df6ffd18c54ca76c3abac3728ea, type: 3}
-  - {fileID: 5413993767572339121, guid: dbfee86b0a3e72542b3c4e6fbb229a75, type: 3}
-  - {fileID: 414921610477409366, guid: 43a025c988b85bf41a7101c22e5eb8bd, type: 3}
+  mappings:
+  - ColorID: 0
+    Sprites:
+    - {fileID: 7985042018138347892, guid: 2a43dd8f5bb146449800cd66eada4199, type: 3}
+    - {fileID: 414921610477409366, guid: 43a025c988b85bf41a7101c22e5eb8bd, type: 3}
+    - {fileID: -6038182108957047188, guid: daf419158949ea54f81988e189e1c0d7, type: 3}
+    - {fileID: -7586140276444505714, guid: 28c4f0a38d5eea44fa3c3e8466c5c076, type: 3}
+  - ColorID: 1
+    Sprites:
+    - {fileID: -7364823422338184377, guid: 5df2f3de2d85a1c4daa4ad41fd0c2c8e, type: 3}
+    - {fileID: 3291406690555587084, guid: 4072eb2eb7ae61048a3c81f6571c6cb1, type: 3}
+    - {fileID: -2176861220364285743, guid: d358e7338210cb44f8482350434455ff, type: 3}
+    - {fileID: 6787462199040882907, guid: 4737e1ed023398f41b20d34addaf394a, type: 3}
+  - ColorID: 2
+    Sprites:
+    - {fileID: 742919511911846744, guid: 77777c2580038e94ea27df8525718ac4, type: 3}
+    - {fileID: 3519922619171193912, guid: 664d276bbd9ea9b45b5d9f8e6dd49519, type: 3}
+    - {fileID: -578229812787739823, guid: 8455d6b0f39ddb347b6148184d468bf2, type: 3}
+    - {fileID: -7755864299962720444, guid: 50fd591f63c7ba943a6e528d23ec8a1e, type: 3}
+  - ColorID: 3
+    Sprites:
+    - {fileID: 8161472552560778960, guid: 8845596ab5cb2f24c893f4c4046d61f2, type: 3}
+    - {fileID: -6416537123964203564, guid: 10856df6ffd18c54ca76c3abac3728ea, type: 3}
+    - {fileID: -2693315669398477313, guid: 1f2e8deecf918f1488947f4a06956d64, type: 3}
+    - {fileID: 1386842339749069192, guid: 7a49aa99031caed46ae29a2496ca132a, type: 3}
+  - ColorID: 4
+    Sprites:
+    - {fileID: 887387325851772620, guid: 97c0ed915e6e3a640b6120d515219058, type: 3}
+    - {fileID: 5413993767572339121, guid: dbfee86b0a3e72542b3c4e6fbb229a75, type: 3}
+    - {fileID: -8329150480449018202, guid: cb30b5176c2378b4f8716fbaf4649455, type: 3}
+    - {fileID: -257787592545182917, guid: ffb6a0380c3f8b546aa2e7d93f5dba45, type: 3}
+  - ColorID: 5
+    Sprites:
+    - {fileID: -4624011131410558117, guid: 1a024689a050f2643a236ae1718be126, type: 3}
+    - {fileID: -8923791490832965560, guid: dac715c47769125438a8a10fcd5f116d, type: 3}
+    - {fileID: -812536794617419617, guid: f8258240222149340ba2cf7bc7816799, type: 3}
+    - {fileID: -2915790821876642617, guid: ca9ea4f2024f25043b0ee95afc3d86bc, type: 3}
 --- !u!4 &1123285557
 Transform:
   m_ObjectHideFlags: 0
