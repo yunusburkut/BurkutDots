@@ -3,12 +3,27 @@ using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Transforms;
 using UnityEngine;
-using Unity.Jobs;
 
 public partial class GroupDetectionSystem : SystemBase
 {
     private SpriteArrayAuthoring colorSpriteManager;
-    private bool hasRun = false;
+    private NativeArray<int> grid;
+    private NativeArray<bool> visited;
+    private int rows = 10;
+    private int columns = 10;
+
+    protected override void OnCreate()
+    {
+        int totalCells = rows * columns;
+        grid = new NativeArray<int>(totalCells, Allocator.Persistent);
+        visited = new NativeArray<bool>(totalCells, Allocator.Persistent);
+    }
+
+    protected override void OnDestroy()
+    {
+        if (grid.IsCreated) grid.Dispose();
+        if (visited.IsCreated) visited.Dispose();
+    }
 
     protected override void OnStartRunning()
     {
@@ -24,15 +39,14 @@ public partial class GroupDetectionSystem : SystemBase
     {
         if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0) return;
 
-        hasRun = true;
+        // Grid ve visited dizilerini sıfırla
+        for (int i = 0; i < grid.Length; i++)
+        {
+            grid[i] = -1;
+            visited[i] = false;
+        }
 
-        int rows = 10;
-        int columns = 10;
-        int totalCells = rows * columns;
-
-        NativeArray<int> grid = new NativeArray<int>(totalCells, Allocator.TempJob);
-        NativeArray<bool> visited = new NativeArray<bool>(totalCells, Allocator.TempJob);
-
+        // Grid'i doldur
         Entities
             .WithAll<TileData, LocalTransform>()
             .ForEach((Entity entity, in TileData tileData, in LocalTransform transform) =>
@@ -45,55 +59,47 @@ public partial class GroupDetectionSystem : SystemBase
                 {
                     grid[index] = tileData.ColorIndex;
                 }
-            }).Run();
+            }).WithoutBurst().Run();
 
-        for (int index = 0; index < totalCells; index++)
+        // Grup tespiti ve sprite güncellemesi
+        for (int index = 0; index < grid.Length; index++)
         {
             if (visited[index] || grid[index] < 0)
                 continue;
 
-            NativeList<int> group = new NativeList<int>(Allocator.Temp);
-            int currentColor = grid[index];
+            var group = new NativeList<int>(Allocator.Temp);
+            FindGroup(index, grid[index], group);
 
-            FindGroup(index, rows, columns, grid, visited, currentColor, group);
-
-            if (group.Length > 0)
+            if (group.Length > -1) // Minimum grup boyutu
             {
-                Sprite selectedSprite = GetSpriteForGroupSize(group.Length, currentColor);
+                Sprite selectedSprite = GetSpriteForGroupSize(group.Length, grid[index]);
 
-                Entities
-                    .WithAll<SpriteRenderer, LocalTransform>()
-                    .ForEach((Entity entity, SpriteRenderer spriteRenderer, in LocalTransform transform) =>
-                    {
-                        int row = (int)math.round(transform.Position.y);
-                        int col = (int)math.round(transform.Position.x);
-                        int cellIndex = row * columns + col;
+                foreach (int cellIndex in group)
+                {
+                    int row = cellIndex / columns;
+                    int col = cellIndex % columns;
 
-                        if (group.Contains(cellIndex))
+                    Entities
+                        .WithAll<SpriteRenderer, LocalTransform>()
+                        .ForEach((Entity entity, SpriteRenderer spriteRenderer, in LocalTransform transform) =>
                         {
-                            spriteRenderer.sprite = selectedSprite;
-                        }
-                    }).WithoutBurst().Run();
+                            if ((int)math.round(transform.Position.y) == row &&
+                                (int)math.round(transform.Position.x) == col)
+                            {
+                                spriteRenderer.sprite = selectedSprite;
+                            }
+                        }).WithoutBurst().Run();
+                }
             }
 
             group.Dispose();
         }
-
-        grid.Dispose();
-        visited.Dispose();
     }
 
-    private void FindGroup(
-        int index,
-        int rows,
-        int columns,
-        NativeArray<int> grid,
-        NativeArray<bool> visited,
-        int color,
-        NativeList<int> group)
+    private void FindGroup(int startIndex, int color, NativeList<int> group)
     {
         NativeQueue<int> queue = new NativeQueue<int>(Allocator.Temp);
-        queue.Enqueue(index);
+        queue.Enqueue(startIndex);
 
         while (queue.TryDequeue(out int currentIndex))
         {
@@ -106,24 +112,16 @@ public partial class GroupDetectionSystem : SystemBase
             int row = currentIndex / columns;
             int col = currentIndex % columns;
 
-            TryAddNeighbor(row - 1, col, rows, columns, grid, visited, color, queue);
-            TryAddNeighbor(row + 1, col, rows, columns, grid, visited, color, queue);
-            TryAddNeighbor(row, col - 1, rows, columns, grid, visited, color, queue);
-            TryAddNeighbor(row, col + 1, rows, columns, grid, visited, color, queue);
+            TryAddNeighbor(row - 1, col, color, queue);
+            TryAddNeighbor(row + 1, col, color, queue);
+            TryAddNeighbor(row, col - 1, color, queue);
+            TryAddNeighbor(row, col + 1, color, queue);
         }
 
         queue.Dispose();
     }
 
-    private void TryAddNeighbor(
-        int row,
-        int col,
-        int rows,
-        int columns,
-        NativeArray<int> grid,
-        NativeArray<bool> visited,
-        int color,
-        NativeQueue<int> queue)
+    private void TryAddNeighbor(int row, int col, int color, NativeQueue<int> queue)
     {
         if (row < 0 || row >= rows || col < 0 || col >= columns)
             return;
