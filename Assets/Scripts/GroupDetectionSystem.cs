@@ -17,6 +17,7 @@ public partial class GroupDetectionSystem : SystemBase
         int totalCells = rows * columns;
         grid = new NativeArray<int>(totalCells, Allocator.Persistent);
         visited = new NativeArray<bool>(totalCells, Allocator.Persistent);
+        
     }
 
     protected override void OnDestroy()
@@ -34,7 +35,7 @@ public partial class GroupDetectionSystem : SystemBase
             Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
         }
     }
-
+    
     protected override void OnUpdate()
     {
         if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0) return;
@@ -80,6 +81,7 @@ public partial class GroupDetectionSystem : SystemBase
                     int col = cellIndex % columns;
 
                     Entities
+                        .WithAbsent<MovingTileComponent>()
                         .WithAll<SpriteRenderer, LocalTransform>()
                         .ForEach((Entity entity, SpriteRenderer spriteRenderer, in LocalTransform transform) =>
                         {
@@ -87,6 +89,7 @@ public partial class GroupDetectionSystem : SystemBase
                                 (int)math.round(transform.Position.x) == col)
                             {
                                 spriteRenderer.sprite = selectedSprite;
+                                spriteRenderer.sortingOrder = row;
                             }
                         }).WithoutBurst().Run();
                 }

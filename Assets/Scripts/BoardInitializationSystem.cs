@@ -57,9 +57,9 @@ public partial class BoardInitializationSystem : SystemBase
                 if (entityManager.HasComponent<SpriteRenderer>(tileEntity))
                 {
                     var spriteRenderer = entityManager.GetComponentObject<SpriteRenderer>(tileEntity);
-                   // spriteRenderer.sprite = colorSpriteManager.mappings[colorIndex].Sprites[0];//ilk spriteyi kullan
+                    spriteRenderer.sprite = colorSpriteManager.mappings[colorIndex].Sprites[0];//ilk spriteyi kullan
                     spriteRenderer.sortingOrder = row; // Satır numarasını sortingOrder olarak kullan
-                    Debug.Log($"TileEntity için Sorting Order Ayarlandı: {row}");
+                    
                 }
                 else
                 {

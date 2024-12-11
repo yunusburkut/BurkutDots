@@ -56,8 +56,8 @@ public partial class FillEmptyTilesSystem : SystemBase
                     int newColor = UnityEngine.Random.Range(0, 6); // Rastgele renk
                     grid[index] = newColor;
 
-                    // Yeni bir tile oluştur
-                    CreateNewTile(row, col, newColor);
+                    // Yeni spawner tile'ı ekle
+                    AddSpawnerTile(col, row, newColor);
                 }
             }
         }
@@ -65,7 +65,9 @@ public partial class FillEmptyTilesSystem : SystemBase
 
     private void UpdateEntityPosition(int col, int oldRow, int newRow)
     {
-        // Eski pozisyondaki entity'yi bul ve yeni pozisyonuna taşı
+        // EntityCommandBuffer oluştur
+        EntityCommandBuffer ecb = new EntityCommandBuffer(Unity.Collections.Allocator.Temp);
+
         Entities
             .WithAll<TileData, LocalTransform>()
             .ForEach((Entity entity, ref LocalTransform transform) =>
@@ -74,41 +76,66 @@ public partial class FillEmptyTilesSystem : SystemBase
 
                 if (entityPos.x == col && entityPos.y == oldRow)
                 {
-                    transform.Position = new float3(col, newRow, transform.Position.z); // Yeni pozisyona taşı
+                    // Hareket bileşeni ekle
+                    ecb.AddComponent(entity, new MovingTileComponent
+                    {
+                        StartPosition = transform.Position,
+                        EndPosition = new float3(col, newRow, transform.Position.z),
+                        Duration = .25f,
+                        ElapsedTime = 0
+                    });
                 }
             }).WithoutBurst().Run();
+
+        // EntityCommandBuffer'daki değişiklikleri uygula
+        Dependency.Complete();
+        ecb.Playback(EntityManager);
+        ecb.Dispose();
     }
 
-    private void CreateNewTile(int row, int col, int colorIndex)
+    private void AddSpawnerTile(int col, int row, int colorIndex)
     {
+        // Spawner tile'ı yukarıda başlat
+        float startRow = 15;
+
         Entity tilePrefab;
         if (!SystemAPI.TryGetSingleton<TilePrefabComponent>(out var tilePrefabComponent))
         {
             UnityEngine.Debug.LogError("TilePrefabComponent bulunamadı!");
             return;
         }
-       
+
         tilePrefab = tilePrefabComponent.PrefabEntity;
 
         Entity newTile = EntityManager.Instantiate(tilePrefab);
+
+        // Başlangıç pozisyonu yukarıda
+        float3 startPosition = new float3(col, startRow, 0);
+        float3 endPosition = new float3(col, row, 0);
+
+        // Tile'ın başlangıç pozisyonunu ayarla
+        EntityManager.SetComponentData(newTile, new LocalTransform
+        {
+            Position = startPosition,
+            Rotation = quaternion.identity,
+            Scale = .45f
+        });
 
         EntityManager.SetComponentData(newTile, new TileData
         {
             ColorIndex = colorIndex,
         });
 
-        EntityManager.SetComponentData(newTile, new LocalTransform
+        // Düşüş animasyonu için hareket bileşeni ekle
+        EntityManager.AddComponentData(newTile, new MovingTileComponent
         {
-            Position = new float3(col, row, 0),//dotween ile düşürmee animasyonunu burda yapacaksın yukarıda başlatıp gelen row+5'den row'a gidecek şekilde row+5 olmasının sebebi ekrarnın dısından dusme eefekti vermek
-            Rotation = quaternion.identity,
-            Scale = .45f
+            StartPosition = startPosition,
+            EndPosition = endPosition,
+            Duration = .25f, // Düşme süresi
+            ElapsedTime = 0
         });
-        if (EntityManager.HasComponent<SpriteRenderer>(newTile))
-        {
-            var spriteRenderer = EntityManager.GetComponentObject<SpriteRenderer>(newTile);
-            // spriteRenderer.sprite = colorSpriteManager.mappings[colorIndex].Sprites[0];//ilk spriteyi kullan
-            spriteRenderer.sortingOrder = row; // Satır numarasını sortingOrder olarak kullan
-            Debug.Log($"TileEntity için Sorting Order Ayarlandı: {row}");
-        }
+
+        // SpriteRenderer ayarları
+       
     }
 }
