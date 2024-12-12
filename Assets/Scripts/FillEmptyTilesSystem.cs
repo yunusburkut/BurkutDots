@@ -84,6 +84,7 @@ public partial class FillEmptyTilesSystem : SystemBase
                         Duration = .25f,
                         ElapsedTime = 0
                     });
+                    ecb.AddComponent<Moving>(entity);
                 }
             }).WithoutBurst().Run();
 
@@ -113,6 +114,7 @@ public partial class FillEmptyTilesSystem : SystemBase
         float3 startPosition = new float3(col, startRow, 0);
         float3 endPosition = new float3(col, row, 0);
 
+        EntityManager.AddComponent<Moving>(newTile);
         // Tile'ın başlangıç pozisyonunu ayarla
         EntityManager.SetComponentData(newTile, new LocalTransform
         {

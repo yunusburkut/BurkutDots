@@ -10,26 +10,21 @@ public class TileAuthoring : MonoBehaviour
     public int DefaultColorIndex = 0;
     public bool IsObstacle = false;
     public int ObstacleHealth = 0;
+    public int2 GridPosition = new int2(0, 5);
 }
 
-// Baking Script
 public class TileBaker : Baker<TileAuthoring>
 {
     public override void Bake(TileAuthoring authoring)
     {
-        // Entity'ye TileData bileşeni ekle
         var entity = GetEntity(TransformUsageFlags.Dynamic);
         AddComponent(entity, new TileData
         {
             ColorIndex = authoring.DefaultColorIndex,
             IsObstacle = authoring.IsObstacle,
-            ObstacleHealth = authoring.ObstacleHealth
+            ObstacleHealth = authoring.ObstacleHealth,
+            GridPosition = authoring.GridPosition
         });
 
-        // Entity'ye Position bileşeni ekle
-        AddComponent(entity, new Position
-        {
-            GridPosition = new int2(0, 5) // Başlangıçta sıfır pozisyon
-        });
     }
 }

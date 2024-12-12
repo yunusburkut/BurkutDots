@@ -10,7 +10,7 @@ public partial class TileSpriteSystem : SystemBase
         if (hasRunOnce)
         {
             // SpriteArrayComponent'e eriş
-            var spriteEntity = GetSingletonEntity<SpriteArrayComponent>();
+            Entity spriteEntity = EntityManager.CreateEntity(typeof(SpriteArrayComponent));
             var spriteArray = EntityManager.GetComponentObject<SpriteArrayComponent>(spriteEntity);
 
             if (spriteArray == null || spriteArray.mappings[0].Sprites.Length == 0)

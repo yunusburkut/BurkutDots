@@ -36,6 +36,7 @@ public partial class BlastGroupSystem : SystemBase
         int2 gridPosition = new int2((int)math.floor(worldPos.x), (int)math.floor(worldPos.y));
 
         NativeList<Entity> groupEntities = FindGroupEntities(gridPosition);
+        
 
         if (groupEntities.Length > 1)
         {

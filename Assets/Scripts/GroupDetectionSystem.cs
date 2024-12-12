@@ -11,43 +11,54 @@ public partial class GroupDetectionSystem : SystemBase
     private NativeArray<bool> visited;
     private int rows = 10;
     private int columns = 10;
-
+    
     protected override void OnCreate()
     {
         int totalCells = rows * columns;
         grid = new NativeArray<int>(totalCells, Allocator.Persistent);
         visited = new NativeArray<bool>(totalCells, Allocator.Persistent);
-        
+        Enabled = false;
     }
-
     protected override void OnDestroy()
     {
         if (grid.IsCreated) grid.Dispose();
         if (visited.IsCreated) visited.Dispose();
     }
-
     protected override void OnStartRunning()
     {
-        colorSpriteManager = Object.FindObjectOfType<SpriteArrayAuthoring>();
+        colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
 
         if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
         {
             Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
         }
     }
-    
     protected override void OnUpdate()
     {
-        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0) return;
+    }
+    // Sistem manuel olarak çalıştırıldığında bu fonksiyon çağrılır
+    public void RunDetection()
+    {
+        colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
 
-        // Grid ve visited dizilerini sıfırla
+        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
+        {
+            Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
+        }
+        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
+        {
+            Debug.LogError("SpriteArrayAuthoring tanımlı değil!");
+            return;
+        }
+
+        // Reset grid and visited arrays
         for (int i = 0; i < grid.Length; i++)
         {
             grid[i] = -1;
             visited[i] = false;
         }
 
-        // Grid'i doldur
+        // Populate the grid
         Entities
             .WithAll<TileData, LocalTransform>()
             .ForEach((Entity entity, in TileData tileData, in LocalTransform transform) =>
@@ -62,7 +73,7 @@ public partial class GroupDetectionSystem : SystemBase
                 }
             }).WithoutBurst().Run();
 
-        // Grup tespiti ve sprite güncellemesi
+        // Detect groups and update sprites
         for (int index = 0; index < grid.Length; index++)
         {
             if (visited[index] || grid[index] < 0)
@@ -71,7 +82,7 @@ public partial class GroupDetectionSystem : SystemBase
             var group = new NativeList<int>(Allocator.Temp);
             FindGroup(index, grid[index], group);
 
-            if (group.Length > -1) // Minimum grup boyutu
+            if (group.Length > -1) // Minimum group size
             {
                 Sprite selectedSprite = GetSpriteForGroupSize(group.Length, grid[index]);
 
@@ -80,10 +91,13 @@ public partial class GroupDetectionSystem : SystemBase
                     int row = cellIndex / columns;
                     int col = cellIndex % columns;
 
+                    var ecb = new EntityCommandBuffer(Unity.Collections.Allocator.TempJob);
+                    var ecbParallel = ecb.AsParallelWriter(); // ParallelWriter oluştur
+
                     Entities
-                        .WithAbsent<MovingTileComponent>()
                         .WithAll<SpriteRenderer, LocalTransform>()
-                        .ForEach((Entity entity, SpriteRenderer spriteRenderer, in LocalTransform transform) =>
+                        .ForEach((Entity entity, int entityInQueryIndex, SpriteRenderer spriteRenderer,
+                            in LocalTransform transform) =>
                         {
                             if ((int)math.round(transform.Position.y) == row &&
                                 (int)math.round(transform.Position.x) == col)
@@ -91,7 +105,14 @@ public partial class GroupDetectionSystem : SystemBase
                                 spriteRenderer.sprite = selectedSprite;
                                 spriteRenderer.sortingOrder = row;
                             }
+
+                            ecbParallel.RemoveComponent<GroupDetectionSystem>(entityInQueryIndex, entity);
                         }).WithoutBurst().Run();
+
+                    Dependency.Complete();
+                    ecb.Playback(EntityManager);
+                    ecb.Dispose();
+
                 }
             }
 
@@ -139,26 +160,25 @@ public partial class GroupDetectionSystem : SystemBase
 
     private Sprite GetSpriteForGroupSize(int groupSize, int colorIndex)
     {
-        // Mapping'den ColorID'ye uygun sprite'ı bul
         foreach (var mapping in colorSpriteManager.mappings)
         {
             if (mapping.ColorID == colorIndex)
             {
                 if (groupSize == 1 && mapping.Sprites.Length > 1)
                 {
-                    return mapping.Sprites[0]; // Grup boyutu 3 için 2. sprite
+                    return mapping.Sprites[0];
                 }
                 else if (groupSize == 2 && mapping.Sprites.Length > 2)
                 {
-                    return mapping.Sprites[1]; // Grup boyutu 4 veya daha büyük için 3. sprite
+                    return mapping.Sprites[1];
                 }
                 else if (groupSize == 3 && mapping.Sprites.Length > 0)
                 {
-                    return mapping.Sprites[2]; // Varsayılan (grup boyutu 2'den büyük)
+                    return mapping.Sprites[2];
                 }
                 else if (groupSize >= 4 && mapping.Sprites.Length > 0)
                 {
-                    return mapping.Sprites[3]; // Varsayılan (grup boyutu 2'den büyük)
+                    return mapping.Sprites[3];
                 }
             }
         }
