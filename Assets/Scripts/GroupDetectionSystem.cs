@@ -1,146 +1,122 @@
-using Unity.Entities;
-using Unity.Mathematics;
+using Unity.Burst;
 using Unity.Collections;
-using Unity.Transforms;
+using Unity.Entities;
+using Unity.Jobs;
 using UnityEngine;
 
 public partial class GroupDetectionSystem : SystemBase
 {
-    private SpriteArrayAuthoring colorSpriteManager;
-    private NativeArray<int> grid;
-    private NativeArray<bool> visited;
-    private int rows = 10;
-    private int columns = 10;
+    private SpriteArrayComponent spriteArrayComponent;
 
-    protected override void OnCreate()
+    protected override void OnUpdate()
     {
-        int totalCells = rows * columns;
-        grid = new NativeArray<int>(totalCells, Allocator.Persistent);
-        visited = new NativeArray<bool>(totalCells, Allocator.Persistent);
         
-    }
-
-    protected override void OnDestroy()
-    {
-        if (grid.IsCreated) grid.Dispose();
-        if (visited.IsCreated) visited.Dispose();
     }
 
     protected override void OnStartRunning()
     {
-        colorSpriteManager = Object.FindObjectOfType<SpriteArrayAuthoring>();
-
-        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
-        {
-            Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
-        }
-    }
-    
-    protected override void OnUpdate()
-    {
-        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0) return;
-
-        // Grid ve visited dizilerini sıfırla
-        for (int i = 0; i < grid.Length; i++)
-        {
-            grid[i] = -1;
-            visited[i] = false;
-        }
-
-        // Grid'i doldur
+        // SubScene'deki SpriteArrayComponent'i almak
         Entities
-            .WithAll<TileData, LocalTransform>()
-            .ForEach((Entity entity, in TileData tileData, in LocalTransform transform) =>
+            .WithAll<SpriteArrayComponent>()
+            .ForEach((Entity entity, SpriteArrayComponent spriteComponent) =>
             {
-                int row = (int)math.round(transform.Position.y);
-                int col = (int)math.round(transform.Position.x);
-                int index = row * columns + col;
+                spriteArrayComponent = spriteComponent;
+            }).WithoutBurst().Run();
 
-                if (index >= 0 && index < grid.Length)
+        if (spriteArrayComponent == null)
+        {
+            Debug.LogError("SpriteArrayComponent bulunamadı! SubScene'den eklenmiş olmalıdır.");
+            return;
+        }
+
+        var gridQuery = GetEntityQuery(typeof(GridComponent));
+        if (gridQuery.CalculateEntityCount() == 0)
+        {
+            Debug.LogError("GridComponent içeren hiçbir entity bulunamadı!");
+            return;
+        }
+
+        var gridEntity = gridQuery.GetSingletonEntity();
+        var gridComponent = EntityManager.GetComponentData<GridComponent>(gridEntity);
+
+        var visited = new NativeArray<bool>(gridComponent.GridData.Length, Allocator.TempJob);
+        var group = new NativeList<int>(Allocator.TempJob);
+        var workQueue = new NativeQueue<int>(Allocator.TempJob);
+
+        var grid = gridComponent.GridData;
+        int rows = gridComponent.Rows;
+        int columns = gridComponent.Columns;
+
+        // Grid üzerinde grup algılama işlemi
+        Entities
+            .WithAll<BoardInitializationSystem.GridEntityBuffer>()
+            .ForEach((DynamicBuffer<BoardInitializationSystem.GridEntityBuffer> gridBuffer) =>
+            {
+                for (int row = 0; row < rows; row++)
                 {
-                    grid[index] = tileData.ColorIndex;
+                    for (int col = 0; col < columns; col++)
+                    {
+                        int index = row * columns + col;
+
+                        // Zaten ziyaret edilmiş veya boş hücreleri atla
+                        if (grid[index] == 0 || visited[index]) continue;
+
+                        int targetColor = grid[index];
+
+                        // Grup algılama işini bir job olarak çalıştır
+                        var job = new GroupDetectionJob
+                        {
+                            Grid = grid,
+                            Rows = rows,
+                            Columns = columns,
+                            StartIndex = index,
+                            TargetColor = targetColor,
+                            Visited = visited,
+                            Group = group,
+                            WorkQueue = workQueue.AsParallelWriter()
+                        };
+
+                        job.Run();
+                       
+
+                        // Grup tespit edildiyse sprite güncelle
+                        group.SortJob().Schedule();
+                        Sprite newSprite = GetSpriteForGroupSize(group.Length,targetColor);
+                        if (newSprite != null)
+                        {
+                            foreach (var cellIndex in group)
+                            {
+                                int rowx = cellIndex / columns; // Hücre satırı
+                             
+
+                                var tileEntity = gridBuffer[cellIndex].Entity;
+                                // SpriteRenderer bileşenini güncelle
+                                if (EntityManager.HasComponent<SpriteRenderer>(tileEntity))
+                                {
+                                    var spriteRenderer = EntityManager.GetComponentObject<SpriteRenderer>(tileEntity);
+                                    spriteRenderer.sortingOrder =  rowx;
+                                    spriteRenderer.sprite = newSprite;
+                                   
+                                    Debug.Log($"Sprite değiştirildi: Entity={tileEntity}, Sprite={newSprite.name}");
+                                }
+                            }
+                       }int entityIndex = gridBuffer[index].Entity.Index;
+                        Debug.Log($"Grid Index: {index}, Entity Index: {entityIndex}, GridValue: {grid[index]}");
+
+                        group.Clear(); // Grup listesini sıfırla
+                    }
                 }
             }).WithoutBurst().Run();
 
-        // Grup tespiti ve sprite güncellemesi
-        for (int index = 0; index < grid.Length; index++)
-        {
-            if (visited[index] || grid[index] < 0)
-                continue;
-
-            var group = new NativeList<int>(Allocator.Temp);
-            FindGroup(index, grid[index], group);
-
-            if (group.Length > -1) // Minimum grup boyutu
-            {
-                Sprite selectedSprite = GetSpriteForGroupSize(group.Length, grid[index]);
-
-                foreach (int cellIndex in group)
-                {
-                    int row = cellIndex / columns;
-                    int col = cellIndex % columns;
-
-                    Entities
-                        .WithAbsent<MovingTileComponent>()
-                        .WithAll<SpriteRenderer, LocalTransform>()
-                        .ForEach((Entity entity, SpriteRenderer spriteRenderer, in LocalTransform transform) =>
-                        {
-                            if ((int)math.round(transform.Position.y) == row &&
-                                (int)math.round(transform.Position.x) == col)
-                            {
-                                spriteRenderer.sprite = selectedSprite;
-                                spriteRenderer.sortingOrder = row;
-                            }
-                        }).WithoutBurst().Run();
-                }
-            }
-
-            group.Dispose();
-        }
-    }
-
-    private void FindGroup(int startIndex, int color, NativeList<int> group)
-    {
-        NativeQueue<int> queue = new NativeQueue<int>(Allocator.Temp);
-        queue.Enqueue(startIndex);
-
-        while (queue.TryDequeue(out int currentIndex))
-        {
-            if (visited[currentIndex])
-                continue;
-
-            visited[currentIndex] = true;
-            group.Add(currentIndex);
-
-            int row = currentIndex / columns;
-            int col = currentIndex % columns;
-
-            TryAddNeighbor(row - 1, col, color, queue);
-            TryAddNeighbor(row + 1, col, color, queue);
-            TryAddNeighbor(row, col - 1, color, queue);
-            TryAddNeighbor(row, col + 1, color, queue);
-        }
-
-        queue.Dispose();
-    }
-
-    private void TryAddNeighbor(int row, int col, int color, NativeQueue<int> queue)
-    {
-        if (row < 0 || row >= rows || col < 0 || col >= columns)
-            return;
-
-        int neighborIndex = row * columns + col;
-
-        if (!visited[neighborIndex] && grid[neighborIndex] == color)
-        {
-            queue.Enqueue(neighborIndex);
-        }
+        visited.Dispose();
+        group.Dispose();
+        workQueue.Dispose();
     }
 
     private Sprite GetSpriteForGroupSize(int groupSize, int colorIndex)
     {
         // Mapping'den ColorID'ye uygun sprite'ı bul
-        foreach (var mapping in colorSpriteManager.mappings)
+        foreach (var mapping in spriteArrayComponent.mappings)
         {
             if (mapping.ColorID == colorIndex)
             {
@@ -162,8 +138,58 @@ public partial class GroupDetectionSystem : SystemBase
                 }
             }
         }
-
         Debug.LogWarning($"Grup boyutu {groupSize} ve renk {colorIndex} için uygun sprite bulunamadı.");
         return null;
+    }
+
+    [BurstCompile]
+    private struct GroupDetectionJob : IJob
+    {
+        [ReadOnly] public NativeArray<int> Grid;
+        public int Rows;
+        public int Columns;
+        public int StartIndex;
+        public int TargetColor;
+
+        public NativeArray<bool> Visited;
+        public NativeList<int> Group;
+        public NativeQueue<int>.ParallelWriter WorkQueue;
+
+        public void Execute()
+        {
+            var localQueue = new NativeQueue<int>(Allocator.Temp);
+            localQueue.Enqueue(StartIndex);
+            Visited[StartIndex] = true;
+
+            while (localQueue.TryDequeue(out int currentIndex))
+            {
+                Group.Add(currentIndex);
+
+                int currentRow = currentIndex / Columns;
+                int currentCol = currentIndex % Columns;
+
+                AddNeighbor(localQueue, currentRow - 1, currentCol); // Yukarı
+                AddNeighbor(localQueue, currentRow, currentCol - 1); // Sol
+                AddNeighbor(localQueue, currentRow + 1, currentCol); // Aşağı
+                AddNeighbor(localQueue, currentRow, currentCol + 1); // Sağ
+            }
+
+            localQueue.Dispose();
+        }
+
+        private void AddNeighbor(NativeQueue<int> queue, int row, int col)
+        {
+            if (row >= 0 && row < Rows && col >= 0 && col < Columns)
+            {
+                int neighborIndex = row * Columns + col;
+
+                if (!Visited[neighborIndex] && Grid[neighborIndex] == TargetColor)
+                {
+                    Visited[neighborIndex] = true;
+                    queue.Enqueue(neighborIndex);
+                }
+            }
+        }
+ 
     }
 }
