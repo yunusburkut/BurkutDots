@@ -230,6 +230,10 @@ MonoBehaviour:
     - {fileID: -8923791490832965560, guid: dac715c47769125438a8a10fcd5f116d, type: 3}
     - {fileID: -812536794617419617, guid: f8258240222149340ba2cf7bc7816799, type: 3}
     - {fileID: -2915790821876642617, guid: ca9ea4f2024f25043b0ee95afc3d86bc, type: 3}
+  - ColorID: 6
+    Sprites:
+    - {fileID: 4941240919024178222, guid: 8bf0570451db7a141964aa9b678b8174, type: 3}
+    - {fileID: 8827842392236584859, guid: ef0fe358afb151a439f6054a946e92f1, type: 3}
 --- !u!4 &1123285557
 Transform:
   m_ObjectHideFlags: 0

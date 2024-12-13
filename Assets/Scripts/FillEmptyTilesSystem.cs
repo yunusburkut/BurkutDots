@@ -5,116 +5,114 @@ using UnityEngine;
 
 public partial class FillEmptyTilesSystem : SystemBase
 {
-    private BlastGroupSystem blastGroupSystem;
-
-    protected override void OnCreate()
+    protected override void OnUpdate()
+{
+    // BoardState'e erişim
+    if (!SystemAPI.TryGetSingleton<BoardState>(out var boardState))
     {
-        // BlastGroupSystem'e erişim
-        blastGroupSystem = World.DefaultGameObjectInjectionWorld.GetExistingSystemManaged<BlastGroupSystem>();
+        Debug.LogError("BoardState bulunamadı. BoardInitializationSystem'in çalıştığından emin olun.");
+        return;
     }
 
-    protected override void OnUpdate()
+    var grid = boardState.Grid;
+    var gridEntities = boardState.GridEntities;
+    int rows = boardState.Rows;
+    int columns = boardState.Columns;
+
+    // Sütun bazlı işlem yap
+    for (int col = 0; col < columns; col++)
     {
-        var grid = blastGroupSystem.GetGrid();
-        int rows = 10;
-        int columns = 10;
+        int writeRow = 0; // Yeni pozisyon için yazma işaretçisi
 
-        // Sütun bazlı işlem yap
-        for (int col = 0; col < columns; col++)
+        // Grid'i alt satırdan üst satıra tarayın
+        for (int row = 0; row < rows; row++)
         {
-            int writeRow = 0; // Yeni pozisyon için yazma işaretçisi
+            int index = row * columns + col;
 
-            // Grid'i alt satırdan üst satıra tarayın
-            for (int row = 0; row < rows; row++)
+            
+            if (grid[index] == -2) // -2 engeller için özel bir işaret
             {
-                int index = row * columns + col;
-
-                if (grid[index] != -1) // Dolu hücre
-                {
-                    if (row != writeRow) // Kaydırılması gerekiyorsa
-                    {
-                        int writeIndex = writeRow * columns + col;
-
-                        // Grid güncelle
-                        grid[writeIndex] = grid[index];
-                        grid[index] = -1;
-
-                        // Entity pozisyonunu güncelle
-                        UpdateEntityPosition(col, row, writeRow);
-                    }
-                    writeRow++; // Yazma işaretçisini bir satır aşağı kaydır
-                }
+                writeRow = row + 1; // Engel üstüne yazma işlemi yapılmaz
+                continue;
             }
 
-            // Yeni bloklar oluştur ve üst satırdan başlat
-            for (int row = writeRow; row < rows; row++)
+            if (grid[index] != -1) // Dolu hücre
             {
-                int index = row * columns + col;
-
-                if (grid[index] == -1) // Boş hücre
+                if (row != writeRow) // Kaydırılması gerekiyorsa
                 {
-                    int newColor = UnityEngine.Random.Range(0, 6); // Rastgele renk
-                    grid[index] = newColor;
+                    int writeIndex = writeRow * columns + col;
 
-                    // Yeni spawner tile'ı ekle
-                    AddSpawnerTile(col, row, newColor);
+                    // Grid ve GridEntities güncelle
+                    grid[writeIndex] = grid[index];
+                    grid[index] = -1;
+
+                    gridEntities[writeIndex] = gridEntities[index];
+                    gridEntities[index] = Entity.Null;
+
+                    // Entity pozisyonunu güncelle
+                    UpdateEntityPosition(gridEntities[writeIndex], col, writeRow);
                 }
+                writeRow++; // Yazma işaretçisini bir satır aşağı kaydır
             }
         }
+
+        // Yeni bloklar oluştur ve üst satırdan başlat
+        // for (int row = writeRow; row < rows; row++)
+        // {
+        //     int index = row * columns + col;
+        //
+        //     if (grid[index] == -1) // Boş hücre
+        //     {
+        //         int newColor = UnityEngine.Random.Range(0, 6); // Rastgele renk
+        //         grid[index] = newColor;
+        //
+        //         Entity newTile = AddSpawnerTile(col, row, newColor);
+        //         gridEntities[index] = newTile; // GridEntities dizisine yeni entity'yi ekle
+        //     }
+        // }
+    }
+}
+
+
+    private void UpdateEntityPosition(Entity entity, int col, int newRow)
+    {
+        if (entity == Entity.Null)
+            return;
+
+        var transform = EntityManager.GetComponentData<LocalTransform>(entity);
+
+        // Hareket bileşeni ekle
+        EntityManager.AddComponentData(entity, new MovingTileComponent
+        {
+            StartPosition = transform.Position,
+            EndPosition = new float3(col, newRow, transform.Position.z),
+            Duration = .25f,
+            ElapsedTime = 0
+        });
+
+        // Hareket durumunu güncellemek için ek bileşen
+        EntityManager.AddComponent<Moving>(entity);
     }
 
-    private void UpdateEntityPosition(int col, int oldRow, int newRow)
+    private Entity AddSpawnerTile(int col, int row, int colorIndex)
     {
-        // EntityCommandBuffer oluştur
-        EntityCommandBuffer ecb = new EntityCommandBuffer(Unity.Collections.Allocator.Temp);
-
-        Entities
-            .WithAll<TileData, LocalTransform>()
-            .ForEach((Entity entity, ref LocalTransform transform) =>
-            {
-                int2 entityPos = new int2((int)math.round(transform.Position.x), (int)math.round(transform.Position.y));
-
-                if (entityPos.x == col && entityPos.y == oldRow)
-                {
-                    // Hareket bileşeni ekle
-                    ecb.AddComponent(entity, new MovingTileComponent
-                    {
-                        StartPosition = transform.Position,
-                        EndPosition = new float3(col, newRow, transform.Position.z),
-                        Duration = .25f,
-                        ElapsedTime = 0
-                    });
-                    ecb.AddComponent<Moving>(entity);
-                }
-            }).WithoutBurst().Run();
-
-        // EntityCommandBuffer'daki değişiklikleri uygula
-        Dependency.Complete();
-        ecb.Playback(EntityManager);
-        ecb.Dispose();
-    }
-
-    private void AddSpawnerTile(int col, int row, int colorIndex)
-    {
-        // Spawner tile'ı yukarıda başlat
+        // Başlangıç pozisyonu yukarıda başlat
         float startRow = 15;
 
-        Entity tilePrefab;
         if (!SystemAPI.TryGetSingleton<TilePrefabComponent>(out var tilePrefabComponent))
         {
-            UnityEngine.Debug.LogError("TilePrefabComponent bulunamadı!");
-            return;
+            Debug.LogError("TilePrefabComponent bulunamadı!");
+            return Entity.Null;
         }
 
-        tilePrefab = tilePrefabComponent.PrefabEntity;
+        Entity tilePrefab = tilePrefabComponent.PrefabEntity;
 
+        // Yeni entity oluştur
         Entity newTile = EntityManager.Instantiate(tilePrefab);
 
-        // Başlangıç pozisyonu yukarıda
         float3 startPosition = new float3(col, startRow, 0);
         float3 endPosition = new float3(col, row, 0);
 
-        EntityManager.AddComponent<Moving>(newTile);
         // Tile'ın başlangıç pozisyonunu ayarla
         EntityManager.SetComponentData(newTile, new LocalTransform
         {
@@ -133,11 +131,13 @@ public partial class FillEmptyTilesSystem : SystemBase
         {
             StartPosition = startPosition,
             EndPosition = endPosition,
-            Duration = .25f, // Düşme süresi
+            Duration = .25f,
             ElapsedTime = 0
         });
 
-        // SpriteRenderer ayarları
-       
+        // Hareket durumunu takip etmek için ek bileşen
+        EntityManager.AddComponent<Moving>(newTile);
+
+        return newTile;
     }
 }
