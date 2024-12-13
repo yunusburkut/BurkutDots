@@ -36,7 +36,7 @@ public partial class FillEmptyTilesSystem : SystemBase
                 continue;
             }
 
-            if (grid[index] != -1) // Dolu hücre
+            if (grid[index] != -1&&grid[index] != -2) // Dolu hücre
             {
                 if (row != writeRow) // Kaydırılması gerekiyorsa
                 {
@@ -57,19 +57,19 @@ public partial class FillEmptyTilesSystem : SystemBase
         }
 
         // Yeni bloklar oluştur ve üst satırdan başlat
-        // for (int row = writeRow; row < rows; row++)
-        // {
-        //     int index = row * columns + col;
-        //
-        //     if (grid[index] == -1) // Boş hücre
-        //     {
-        //         int newColor = UnityEngine.Random.Range(0, 6); // Rastgele renk
-        //         grid[index] = newColor;
-        //
-        //         Entity newTile = AddSpawnerTile(col, row, newColor);
-        //         gridEntities[index] = newTile; // GridEntities dizisine yeni entity'yi ekle
-        //     }
-        // }
+        for (int row = writeRow; row < rows; row++)
+        {
+            int index = row * columns + col;
+        
+            if (grid[index] == -1) // Boş hücre
+            {
+                int newColor = UnityEngine.Random.Range(0, 6); // Rastgele renk
+                grid[index] = newColor;
+        
+                Entity newTile = AddSpawnerTile(col, row, newColor);
+                gridEntities[index] = newTile; // GridEntities dizisine yeni entity'yi ekle
+            }
+        }
     }
 }
 
@@ -86,7 +86,7 @@ public partial class FillEmptyTilesSystem : SystemBase
         {
             StartPosition = transform.Position,
             EndPosition = new float3(col, newRow, transform.Position.z),
-            Duration = .25f,
+            Duration = .5f,
             ElapsedTime = 0
         });
 
@@ -112,7 +112,16 @@ public partial class FillEmptyTilesSystem : SystemBase
 
         float3 startPosition = new float3(col, startRow, 0);
         float3 endPosition = new float3(col, row, 0);
+// Normal taş oluştur
+        
+        SpriteArrayAuthoring colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
 
+        if (EntityManager.HasComponent<SpriteRenderer>(newTile))
+        {
+            var spriteRenderer = EntityManager.GetComponentObject<SpriteRenderer>(newTile);
+            spriteRenderer.sprite = colorSpriteManager.mappings[colorIndex].Sprites[0];
+            spriteRenderer.sortingOrder = row;
+        }
         // Tile'ın başlangıç pozisyonunu ayarla
         EntityManager.SetComponentData(newTile, new LocalTransform
         {
@@ -131,7 +140,7 @@ public partial class FillEmptyTilesSystem : SystemBase
         {
             StartPosition = startPosition,
             EndPosition = endPosition,
-            Duration = .25f,
+            Duration = .5f,
             ElapsedTime = 0
         });
 

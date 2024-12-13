@@ -18,6 +18,7 @@ public partial class TileMovementSystem : SystemBase
         World.DefaultGameObjectInjectionWorld
             .GetOrCreateSystemManaged<GroupDetectionSystem>().RunDetection();
     }
+    [BurstCompile]
     protected override void OnUpdate()
     {
         float deltaTime = World.Time.DeltaTime;
@@ -32,14 +33,17 @@ public partial class TileMovementSystem : SystemBase
                 ref LocalTransform transform) =>
             {
                 // Geçen zamanı güncelle
+                float distance = math.abs(movingTile.StartPosition.y - movingTile.EndPosition.y);
+                // Süreyi mesafeye göre hesapla
+                // movingTile.Duration = distance / 10;
+                // Animasyonu güncelle
                 movingTile.ElapsedTime += deltaTime;
-
                 // Animasyon oranı (0 ile 1 arasında)
-                float t = math.saturate(math.square(movingTile.ElapsedTime / movingTile.Duration));
+                float t = math.saturate(movingTile.ElapsedTime / movingTile.Duration);
 
                 // Lineer interpolasyon (Lerp) ile pozisyonu güncelle
                 transform.Position = math.lerp(movingTile.StartPosition, movingTile.EndPosition, t);
-                // Animasyon tamamlandıysa hareket bileşenini kaldır
+
                 if (t >= 1.0f)
                 {
                     ecbParallel.RemoveComponent<MovingTileComponent>(entityInQueryIndex, entity); // ParallelWriter kullan
