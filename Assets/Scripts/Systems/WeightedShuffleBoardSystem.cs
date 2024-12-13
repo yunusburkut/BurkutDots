@@ -88,9 +88,9 @@ public partial class WeightedShuffleBoardSystem : SystemBase
             {
                 var tileEntity = gridEntities[i];
 
-                if (EntityManager.HasComponent<TileData>(tileEntity))
+                if (EntityManager.HasComponent<TileDataComponent>(tileEntity))
                 {
-                    var tileData = EntityManager.GetComponentData<TileData>(tileEntity);
+                    var tileData = EntityManager.GetComponentData<TileDataComponent>(tileEntity);
                     tileData.ColorIndex = grid[i];
                     EntityManager.SetComponentData(tileEntity, tileData);
 

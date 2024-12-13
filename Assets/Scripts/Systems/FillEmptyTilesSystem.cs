@@ -130,7 +130,7 @@ public partial class FillEmptyTilesSystem : SystemBase
             Scale = .45f
         });
 
-        EntityManager.SetComponentData(newTile, new TileData
+        EntityManager.SetComponentData(newTile, new TileDataComponent
         {
             ColorIndex = colorIndex,
         });

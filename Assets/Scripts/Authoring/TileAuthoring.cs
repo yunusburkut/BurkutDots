@@ -18,11 +18,9 @@ public class TileBaker : Baker<TileAuthoring>
     public override void Bake(TileAuthoring authoring)
     {
         var entity = GetEntity(TransformUsageFlags.Dynamic);
-        AddComponent(entity, new TileData
+        AddComponent(entity, new TileDataComponent
         {
             ColorIndex = authoring.DefaultColorIndex,
-            IsObstacle = authoring.IsObstacle,
-            ObstacleHealth = authoring.ObstacleHealth,
             GridPosition = authoring.GridPosition
         });
 

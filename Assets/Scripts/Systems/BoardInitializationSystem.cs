@@ -91,7 +91,7 @@ public partial class BoardInitializationSystem : SystemBase
             grid[index] = UnityEngine.Random.Range(0, colorCount); // Renk indeksini kaydet
             gridEntities[index] = tileEntity;
 
-            entityManager.SetComponentData(tileEntity, new TileData
+            entityManager.SetComponentData(tileEntity, new TileDataComponent
             {
                 ColorIndex = grid[index] // Renk indeksini taş bileşenine aktar
             });
