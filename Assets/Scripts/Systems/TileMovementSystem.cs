@@ -25,26 +25,21 @@ public partial class TileMovementSystem : SystemBase
 
         // EntityCommandBuffer oluştur
         var ecb = new EntityCommandBuffer(Unity.Collections.Allocator.TempJob);
-        var ecbParallel = ecb.AsParallelWriter(); // ParallelWriter oluştur
+        var ecbParallel = ecb.AsParallelWriter(); // Paralel işlem yapmak için parallelwriter oluşturuyoruz 
 
         Entities
             .WithAll<Moving, MovingTileComponent, LocalTransform>()
             .ForEach((Entity entity, int entityInQueryIndex, ref MovingTileComponent movingTile,
                 ref LocalTransform transform) =>
             {
-                // Geçen zamanı güncelle
                 float distance = math.abs(movingTile.StartPosition.y - movingTile.EndPosition.y);
-                // Süreyi mesafeye göre hesapla
+                // Süreyi mesafeye göre hesaplaadım her tile aynı hızda düşsün diye ama garip bi hata iile karşılaştıgım için commentledim
                 // movingTile.Duration = distance / 10;
-                // Animasyonu güncelle
                 movingTile.ElapsedTime += deltaTime;
-                // Animasyon oranı (0 ile 1 arasında)
                 float t = math.saturate(movingTile.ElapsedTime / movingTile.Duration);
-
-                // Lineer interpolasyon (Lerp) ile pozisyonu güncelle
                 transform.Position = math.lerp(movingTile.StartPosition, movingTile.EndPosition, t);
                
-                if (t >= 1.0f) //Animasyon tamamlandı demek
+                if (t >= 1.0f) //Ulaşmasını istedigimiz süre tamamladı "Animasyon" tamamladı check'i
                 {
                     ecbParallel.RemoveComponent<MovingTileComponent>(entityInQueryIndex, entity); 
                     ecbParallel.RemoveComponent<Moving>(entityInQueryIndex, entity); 
@@ -52,8 +47,8 @@ public partial class TileMovementSystem : SystemBase
             }).ScheduleParallel();
 
         
-        Dependency.Complete(); // Paralel işlerin tamamlanmasını bekle
-        ecb.Playback(EntityManager); // Değişiklikleri uygula
-        ecb.Dispose(); // Bellek temizliği
+        Dependency.Complete(); // Paralel işlerin tamamlanmasını bekliyoruz
+        ecb.Playback(EntityManager); // Değişiklikleri uyguluyoruz
+        ecb.Dispose(); // Olası bi leak önlemek için bellek temizliyoruz
     }
 }

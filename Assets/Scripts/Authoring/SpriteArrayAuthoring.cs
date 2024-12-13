@@ -17,10 +17,10 @@ public class SpriteArrayBaker : Baker<SpriteArrayAuthoring>
 {
     public override void Bake(SpriteArrayAuthoring authoring)
     {
-        // SubScene'deki GameObject'i Entity'ye dönüştür
+        //SubScene'deki GameObject'i Entity'ye dönüştürüyoruz
         var entity = GetEntity(TransformUsageFlags.Dynamic);
 
-        // SpriteArrayComponent'i global bileşen olarak ekle
+        //SpriteArrayComponent'i ekliiyoruz
         AddComponentObject(entity, new SpriteArrayComponent
         {
             mappings = authoring.mappings

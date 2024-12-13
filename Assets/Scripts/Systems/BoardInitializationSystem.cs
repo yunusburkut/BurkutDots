@@ -1,10 +1,12 @@
 using System.Collections.Generic;
+using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 using Unity.Collections;
 using UnityEngine;
 
+[BurstCompile]
 public partial class BoardInitializationSystem : SystemBase
 {
     private Entity tilePrefab;
@@ -15,7 +17,7 @@ public partial class BoardInitializationSystem : SystemBase
 
     protected override void OnStartRunning()
     {
-        mapSettings = Object.FindObjectOfType<MapSettings>();
+        mapSettings = Object.FindFirstObjectByType<MapSettings>();
         if (!mapSettings)
         {
             Debug.LogError("MapSettings bileşeni sahnede bulunamadı!");
@@ -46,7 +48,6 @@ public partial class BoardInitializationSystem : SystemBase
     var entityManager = EntityManager;
     SpriteArrayAuthoring colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
 
-    // Engel pozisyonları
     var obstaclePositions = obstaclePositionsCache;
     
 
@@ -58,16 +59,16 @@ public partial class BoardInitializationSystem : SystemBase
 
             if (obstaclePositions.Contains(new int2(col, row)))
             {
-                // Obstacle oluştur
+                //Obstacle oluştur
                 var obstacleEntity = entityManager.Instantiate(tilePrefab);
             
-                // Grid'de engel olarak işaretle (-2)
+                //Grid'de obstacle olarak işaretle (-2)
                 grid[index] = -2;
                 gridEntities[index] = obstacleEntity;
                
                 EntityManager.AddComponentData(obstacleEntity, new ObstacleData
                 {
-                    Health = 2, // Örneğin 2 can
+                    Health = 2, 
                     
                 });
                 entityManager.SetComponentData(obstacleEntity, new LocalTransform
@@ -86,14 +87,13 @@ public partial class BoardInitializationSystem : SystemBase
                 continue;
             }
 
-            // Normal taş oluştur
             var tileEntity = entityManager.Instantiate(tilePrefab);
-            grid[index] = UnityEngine.Random.Range(0, colorCount); // Renk indeksini kaydet
+            grid[index] = UnityEngine.Random.Range(0, colorCount); 
             gridEntities[index] = tileEntity;
 
             entityManager.SetComponentData(tileEntity, new TileDataComponent
             {
-                ColorIndex = grid[index] // Renk indeksini taş bileşenine aktar
+                ColorIndex = grid[index] 
             });
             entityManager.SetComponentData(tileEntity, new LocalTransform
             {
@@ -111,7 +111,6 @@ public partial class BoardInitializationSystem : SystemBase
         }
     }
 
-    // BoardState Singleton bileşenini oluştur
     var boardStateEntity = entityManager.CreateEntity(typeof(BoardState));
     entityManager.SetComponentData(boardStateEntity, new BoardState
     {

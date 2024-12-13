@@ -101,8 +101,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   DefaultColorIndex: 0
-  IsObstacle: 0
-  ObstacleHealth: 0
   GridPosition:
     x: 0
     y: 5

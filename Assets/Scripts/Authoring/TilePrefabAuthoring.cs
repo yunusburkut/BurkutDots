@@ -3,7 +3,7 @@ using Unity.Entities;
 
 public class TilePrefabAuthoring : MonoBehaviour
 {
-    public GameObject TilePrefab; // Prefab bağlantısı
+    public GameObject TilePrefab; //Prefab bağlantısı
 }
 
 public class TilePrefabBaker : Baker<TilePrefabAuthoring>

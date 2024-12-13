@@ -8,8 +8,6 @@ using UnityEngine.UIElements;
 public class TileAuthoring : MonoBehaviour
 {
     public int DefaultColorIndex = 0;
-    public bool IsObstacle = false;
-    public int ObstacleHealth = 0;
     public int2 GridPosition = new int2(0, 5);
 }
 

@@ -1,10 +1,13 @@
+using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
+[BurstCompile]
 public partial class FillEmptyTilesSystem : SystemBase
 {
+    private MapSettings mapSettings;
     protected override void OnUpdate()
     {
     }
@@ -13,8 +16,15 @@ public partial class FillEmptyTilesSystem : SystemBase
     {
         base.OnStartRunning();
         Enabled = false;
+        mapSettings = Object.FindFirstObjectByType<MapSettings>();
+        if (!mapSettings)
+        {
+            Debug.LogError("MapSettings bileşeni sahnede bulunamadı!");
+            Enabled = false;
+            return;
+        }
     }
-
+    
     public void RunDetection()
     {
         // BoardState'e erişim
@@ -40,44 +50,39 @@ public partial class FillEmptyTilesSystem : SystemBase
             int index = row * columns + col;
 
             
-            if (grid[index] == -2) // -2 engeller için özel bir işaret
+            if (grid[index] == -2) // -2 obstacle 
             {
-                writeRow = row + 1; // Engel üstüne yazma işlemi yapılmaz
+                writeRow = row + 1; //Obstacleların üzerine yazma işlemi yapılmasın diye +1 ekliyoruz row'a üstüne yazsın diye
                 continue;
             }
 
-            if (grid[index] != -1&&grid[index] != -2) // Dolu hücre
+            if (grid[index] != -1&&grid[index] != -2) 
             {
-                if (row != writeRow) // Kaydırılması gerekiyorsa
+                if (row != writeRow) //Row'un kaydırılması gerekiyor mu check'i
                 {
                     int writeIndex = writeRow * columns + col;
-
-                    // Grid ve GridEntities güncelle
                     grid[writeIndex] = grid[index];
                     grid[index] = -1;
 
                     gridEntities[writeIndex] = gridEntities[index];
                     gridEntities[index] = Entity.Null;
 
-                    // Entity pozisyonunu güncelle
                     UpdateEntityPosition(gridEntities[writeIndex], col, writeRow);
                 }
-                writeRow++; // Yazma işaretçisini bir satır aşağı kaydır
+                writeRow++; 
             }
         }
-
-        // Yeni bloklar oluştur ve üst satırdan başlat
         for (int row = writeRow; row < rows; row++)
         {
             int index = row * columns + col;
         
-            if (grid[index] == -1) // Boş hücre
+            if (grid[index] == -1) // -1 boş hücre check'i
             {
-                int newColor = UnityEngine.Random.Range(0, 6); // Rastgele renk
+                int newColor = UnityEngine.Random.Range(0, 6); 
                 grid[index] = newColor;
         
                 Entity newTile = AddSpawnerTile(col, row, newColor);
-                gridEntities[index] = newTile; // GridEntities dizisine yeni entity'yi ekle
+                gridEntities[index] = newTile;
             }
         }
     } 
@@ -90,7 +95,7 @@ public partial class FillEmptyTilesSystem : SystemBase
 
         var transform = EntityManager.GetComponentData<LocalTransform>(entity);
 
-        // Hareket bileşeni ekle
+        // entity'nin hareket etmesini sağlayan component'ı ekliyoruz
         EntityManager.AddComponentData(entity, new MovingTileComponent
         {
             StartPosition = transform.Position,
@@ -99,14 +104,13 @@ public partial class FillEmptyTilesSystem : SystemBase
             ElapsedTime = 0
         });
 
-        // Hareket durumunu güncellemek için ek bileşen
+        // Diğer sistemlerde state belirtmek için component eklemeyi tercih ettim
         EntityManager.AddComponent<Moving>(entity);
     }
 
     private Entity AddSpawnerTile(int col, int row, int colorIndex)
     {
-        // Başlangıç pozisyonu yukarıda başlat
-        float startRow = 15;
+        float startRow = mapSettings.M+5;//girilen row sayısına göre hep 5 row üstünde spawnlıyor
 
         if (!SystemAPI.TryGetSingleton<TilePrefabComponent>(out var tilePrefabComponent))
         {
@@ -115,14 +119,9 @@ public partial class FillEmptyTilesSystem : SystemBase
         }
 
         Entity tilePrefab = tilePrefabComponent.PrefabEntity;
-
-        // Yeni entity oluştur
         Entity newTile = EntityManager.Instantiate(tilePrefab);
-
         float3 startPosition = new float3(col, startRow, 0);
         float3 endPosition = new float3(col, row, 0);
-// Normal taş oluştur
-        
         SpriteArrayAuthoring colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
 
         if (EntityManager.HasComponent<SpriteRenderer>(newTile))
@@ -131,7 +130,7 @@ public partial class FillEmptyTilesSystem : SystemBase
             spriteRenderer.sprite = colorSpriteManager.mappings[colorIndex].Sprites[0];
             spriteRenderer.sortingOrder = row;
         }
-        // Tile'ın başlangıç pozisyonunu ayarla
+        // Tile'ın başlangıç pozisyonunu ayarlıyoruz
         EntityManager.SetComponentData(newTile, new LocalTransform
         {
             Position = startPosition,
@@ -144,7 +143,7 @@ public partial class FillEmptyTilesSystem : SystemBase
             ColorIndex = colorIndex,
         });
 
-        // Düşüş animasyonu için hareket bileşeni ekle
+        // Düşüş animasyonu için hareket bileşeni ekliyoruz
         EntityManager.AddComponentData(newTile, new MovingTileComponent
         {
             StartPosition = startPosition,
@@ -152,8 +151,6 @@ public partial class FillEmptyTilesSystem : SystemBase
             Duration = .5f,
             ElapsedTime = 0
         });
-
-        // Hareket durumunu takip etmek için ek bileşen
         EntityManager.AddComponent<Moving>(newTile);
 
         return newTile;

@@ -2,7 +2,6 @@ using UnityEngine;
 
 public class ChangeMainCameraPosition : MonoBehaviour
 {
-    // Yeni pozisyon
     public Vector3 newPosition;
     private MapSettings mapSettings;
     void Start()
@@ -21,7 +20,7 @@ public class ChangeMainCameraPosition : MonoBehaviour
             m = m / 2;
             n = n / 2;
             newPosition = new Vector3(m, n, -10);
-            // Ana kameranın pozisyonunu değiştir
+            // Ana kameranın pozisyonunu row sayısına göre değiştiriyoruz uzaklıgınıda ona göre ayarlıyoruz
             Camera.main.transform.position = newPosition;
             Camera.main.orthographicSize = n;
             Debug.Log("Ana kameranın pozisyonu değiştirildi: " + newPosition);

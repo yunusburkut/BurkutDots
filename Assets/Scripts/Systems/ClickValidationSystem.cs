@@ -1,9 +1,10 @@
+using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Transforms;
 using UnityEngine;
-
+[BurstCompile]
 public partial class ClickValidationSystem : SystemBase
 {
     private SpriteArrayAuthoring colorSpriteManager;
@@ -53,7 +54,7 @@ public partial class ClickValidationSystem : SystemBase
         // Geçersiz hücre kontrolü
         if (grid[index] == -1 || grid[index] == -2)
         {
-            Debug.Log("Boş veya engel tile'a tıklandı.");
+            Debug.Log("Boş veya obstacle'a tıklandı.");
             return;
         }
 
@@ -65,15 +66,13 @@ public partial class ClickValidationSystem : SystemBase
             return;
         }
 
-        
-        // Grup tespit et
         NativeList<Entity> groupEntities = FindGroupEntities(gridPosition, boardState);
 
         if (groupEntities.Length > 1)
         {
             var ecb = new EntityCommandBuffer(Allocator.TempJob);
 
-            // Grubu patlat
+            //Grubu patlat
             foreach (var entity in groupEntities)
             {
                 if (EntityManager.HasComponent<LocalTransform>(entity))
@@ -89,8 +88,6 @@ public partial class ClickValidationSystem : SystemBase
 
                 ecb.DestroyEntity(entity);
             }
-
-            // Obstacle canını azalt ve yönet
             DecreaseObstacleHealth(grid, gridEntities, groupEntities, rows, columns, ecb);
 
             ecb.Playback(EntityManager);
@@ -98,9 +95,7 @@ public partial class ClickValidationSystem : SystemBase
         }
         var world = World.DefaultGameObjectInjectionWorld;
         var fillEmptyTilesSystem = world.GetOrCreateSystemManaged<FillEmptyTilesSystem>();
-
-// Boşlukları doldurmayı tetikle
-        fillEmptyTilesSystem.RunDetection();
+        fillEmptyTilesSystem.RunDetection();//Boşlukları doldurmayı tetikliyoruz
         groupEntities.Dispose();
         Dependency.Complete();
     }
@@ -125,10 +120,14 @@ public partial class ClickValidationSystem : SystemBase
 
             if (boardState.Grid[index] != groupColor)
                 continue;
+            
+            Entity entity = boardState.GridEntities[index];
+            if (EntityManager.HasComponent<Moving>(entity))
+            {
+                continue; //Hareket eden entityleri grup patlatma eventine dahil etmiyoruz gridlerin boş kalmasına sebep olan bi hata yarattı
+            }
 
-            groupEntities.Add(boardState.GridEntities[index]);
-
-            // Komşuları sıraya ekle
+            groupEntities.Add(entity);
             queue.Enqueue(new int2(current.x + 1, current.y));
             queue.Enqueue(new int2(current.x - 1, current.y));
             queue.Enqueue(new int2(current.x, current.y + 1));
@@ -141,6 +140,7 @@ public partial class ClickValidationSystem : SystemBase
         return groupEntities;
     }
 
+
     private void DecreaseObstacleHealth(NativeArray<int> grid, NativeArray<Entity> gridEntities, NativeList<Entity> groupEntities, int rows, int columns, EntityCommandBuffer ecb)
     {
         foreach (var entity in groupEntities)
@@ -152,7 +152,6 @@ public partial class ClickValidationSystem : SystemBase
             int row = (int)math.round(transform.Position.y);
             int col = (int)math.round(transform.Position.x);
 
-            // Komşuları kontrol et
             CheckAndDecreaseObstacle(row - 1, col, grid, gridEntities, rows, columns, ecb);
             CheckAndDecreaseObstacle(row + 1, col, grid, gridEntities, rows, columns, ecb);
             CheckAndDecreaseObstacle(row, col - 1, grid, gridEntities, rows, columns, ecb);
@@ -167,7 +166,7 @@ public partial class ClickValidationSystem : SystemBase
 
         int index = row * columns + col;
 
-        if (grid[index] == -2) // Obstacle kontrolü
+        if (grid[index] == -2)//Obstacle kontrolü
         {
             Entity obstacleEntity = gridEntities[index];
             if (EntityManager.HasComponent<ObstacleData>(obstacleEntity))

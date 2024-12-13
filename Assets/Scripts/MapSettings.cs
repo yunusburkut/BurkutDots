@@ -27,7 +27,4 @@ public class MapSettings : MonoBehaviour
     [Tooltip("Grid positions of obstacles.")]
     public List<int2> ObstaclePositions;
 
-    [Header("Deadlock Shuffle Color Weights")]
-    [Tooltip("Weight for each color index.")]
-    public float[] ColorWeights;
 }

@@ -480,8 +480,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b18d23f74beb406d95ded6ff0dd5dc44, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  M: 14
-  N: 14
+  M: 10
+  N: 10
   K: 6
   A: 3
   B: 5
@@ -489,13 +489,6 @@ MonoBehaviour:
   ObstaclePositions:
   - x: 5
     y: 5
-  ColorWeights:
-  - 1
-  - 1
-  - 1
-  - 1
-  - 1
-  - 1
 --- !u!4 &1559252569
 Transform:
   m_ObjectHideFlags: 0

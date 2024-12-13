@@ -1,9 +1,10 @@
+using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Collections;
 using Unity.Transforms;
 using UnityEngine;
-
+[BurstCompile]
 public partial class GroupDetectionSystem : SystemBase
 {
     protected override void OnUpdate()
@@ -23,7 +24,7 @@ public partial class GroupDetectionSystem : SystemBase
         {
             Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
         }
-        mapSettings = Object.FindObjectOfType<MapSettings>();
+        mapSettings = Object.FindFirstObjectByType<MapSettings>();
         if (!mapSettings)
         {
             Debug.LogError("MapSettings bileşeni sahnede bulunamadı!");
@@ -31,6 +32,7 @@ public partial class GroupDetectionSystem : SystemBase
             return;
         }
         Enabled = false;
+        RunDetection();
     }
     
     public void RunDetection()
@@ -43,24 +45,23 @@ public partial class GroupDetectionSystem : SystemBase
         }
         BlastableArrayCount = 0;
         var grid = boardState.Grid;
-        var gridEntities = boardState.GridEntities;
         rows = boardState.Rows;
         columns = boardState.Columns;
 
-        // Ziyaret edilen hücreleri işaretlemek için geçici bir NativeArray oluşturun
+        // Ziyaret edilen hücreleri işaretlemek için geçici bir NativeArray oluşturuyoruz
         NativeArray<bool> visited = new NativeArray<bool>(grid.Length, Allocator.Temp);
      
-        // Grup tespiti ve sprite güncellemesi
+   
         for (int index = 0; index < grid.Length; index++)
         {
             if (visited[index] || grid[index] < 0 || grid[index] == -2)
-                continue; // Ziyaret edilen, boş veya engel hücreleri atla
+                continue; 
 
             var group = new NativeList<int>(Allocator.Temp);
             FindGroup(index, grid[index], group, grid, visited);
             Sprite selectedSprite = GetSpriteForGroupSize(group.Length, grid[index]);
 
-            if (group.Length > 1) // Minimum grup boyutu kontrolü
+            if (group.Length > 1) //Minimum grup boyutu kontrolü, dynamic yapılabiilirdi 
             {
                 if (selectedSprite != null)
                 {
@@ -81,8 +82,6 @@ public partial class GroupDetectionSystem : SystemBase
         {
             DeadlockShuffle();
         }
-
-        
         visited.Dispose();
     }
 
@@ -95,43 +94,39 @@ public partial class GroupDetectionSystem : SystemBase
         {
             if (visited[currentIndex])
                 continue;
-
-            // Engel veya boş hücreleri atla
             if (grid[currentIndex] == -2 || grid[currentIndex] == -1)
                 continue;
-
+            
             visited[currentIndex] = true;
             group.Add(currentIndex);
-
             int row = currentIndex / columns;
             int col = currentIndex % columns;
+            
             //Komşuları tara
             TryAddNeighbor(row - 1, col, color, queue, grid, visited); 
             TryAddNeighbor(row + 1, col, color, queue, grid, visited);
             TryAddNeighbor(row, col - 1, color, queue, grid, visited); 
             TryAddNeighbor(row, col + 1, color, queue, grid, visited);
         }
-
         queue.Dispose();
     }
 
     private void TryAddNeighbor(int row, int col, int color, NativeQueue<int> queue, NativeArray<int> grid, NativeArray<bool> visited)
     {
-        // Grid sınırlarının dışında ise ekleme
+        //Grid sınırlarının dışında ise ekleme
         if (row < 0 || row >= rows || col < 0 || col >= columns)
             return;
 
         int neighborIndex = row * columns + col;
-
-        // Eğer hücre ziyaret edilmişse veya engelse işlem yapma
-        if (!visited[neighborIndex] && grid[neighborIndex] == color && grid[neighborIndex] != -2)
+        
+        if (!visited[neighborIndex] && grid[neighborIndex] == color && grid[neighborIndex] != -2 )
         {
             queue.Enqueue(neighborIndex);
         }
     }
 
     private Sprite GetSpriteForGroupSize(int groupSize, int colorIndex)
-    {
+    {//inspector'dan atadıgımız spriteları çekiyor
         foreach (var mapping in colorSpriteManager.mappings)
         {
             if (mapping.ColorID == colorIndex)
@@ -166,7 +161,7 @@ public partial class GroupDetectionSystem : SystemBase
             int row = cellIndex / columns;
             int col = cellIndex % columns;
 
-            if (grid[cellIndex] == -2) // Engel hücreleri atla
+            if (grid[cellIndex] == -2) 
                 continue;
 
             var ecb = new EntityCommandBuffer(Unity.Collections.Allocator.TempJob);

@@ -1,7 +1,7 @@
 using Unity.Entities;
 using UnityEngine;
 
-public class ClickListener : MonoBehaviour
+public class ClickDetectionSystem : MonoBehaviour
 {
     private Camera mainCamera;
     private ClickValidationSystem clickValidationSystem;
@@ -15,7 +15,7 @@ public class ClickListener : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetMouseButtonDown(0)) // Sol fare tıklaması
+        if (Input.GetMouseButtonDown(0)) //Sol fare tıklaması
         {
             Vector3 worldPos = mainCamera.ScreenToWorldPoint(Input.mousePosition);
             clickValidationSystem.ProcessClick(worldPos);
