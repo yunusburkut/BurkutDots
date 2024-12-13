@@ -43,15 +43,15 @@ public partial class TileMovementSystem : SystemBase
 
                 // Lineer interpolasyon (Lerp) ile pozisyonu güncelle
                 transform.Position = math.lerp(movingTile.StartPosition, movingTile.EndPosition, t);
-
-                if (t >= 1.0f)
+               
+                if (t >= 1.0f) //Animasyon tamamlandı demek
                 {
-                    ecbParallel.RemoveComponent<MovingTileComponent>(entityInQueryIndex, entity); // ParallelWriter kullan
-                    ecbParallel.RemoveComponent<Moving>(entityInQueryIndex, entity); // ParallelWriter kullan
+                    ecbParallel.RemoveComponent<MovingTileComponent>(entityInQueryIndex, entity); 
+                    ecbParallel.RemoveComponent<Moving>(entityInQueryIndex, entity); 
                 }
             }).ScheduleParallel();
 
-        // İşlem tamamlandıktan sonra EntityCommandBuffer değişikliklerini uygula
+        
         Dependency.Complete(); // Paralel işlerin tamamlanmasını bekle
         ecb.Playback(EntityManager); // Değişiklikleri uygula
         ecb.Dispose(); // Bellek temizliği

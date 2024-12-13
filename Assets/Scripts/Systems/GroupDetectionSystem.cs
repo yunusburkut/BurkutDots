@@ -191,7 +191,7 @@ public partial class GroupDetectionSystem : SystemBase
     private void DeadlockShuffle()
     {
         var world = World.DefaultGameObjectInjectionWorld;
-        WeightedShuffleBoardSystem ShuffleBoardSystemz = world.GetOrCreateSystemManaged<WeightedShuffleBoardSystem>();
-        ShuffleBoardSystemz.ShuffleBoard();
+        WeightedShuffleBoardSystem ShuffleBoardSystemTri = world.GetOrCreateSystemManaged<WeightedShuffleBoardSystem>();
+        ShuffleBoardSystemTri.ShuffleBoard();
     }
 }
