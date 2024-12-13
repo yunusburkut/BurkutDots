@@ -65,8 +65,7 @@ public partial class ClickValidationSystem : SystemBase
             return;
         }
 
-        Debug.Log($"Geçerli tile tıklandı: {gridPosition}");
-
+        
         // Grup tespit et
         NativeList<Entity> groupEntities = FindGroupEntities(gridPosition, boardState);
 
@@ -97,7 +96,11 @@ public partial class ClickValidationSystem : SystemBase
             ecb.Playback(EntityManager);
             ecb.Dispose();
         }
+        var world = World.DefaultGameObjectInjectionWorld;
+        var fillEmptyTilesSystem = world.GetOrCreateSystemManaged<FillEmptyTilesSystem>();
 
+// Boşlukları doldurmayı tetikle
+        fillEmptyTilesSystem.RunDetection();
         groupEntities.Dispose();
         Dependency.Complete();
     }
@@ -183,7 +186,6 @@ public partial class ClickValidationSystem : SystemBase
                 {
                     UpdateObstacleSprite(obstacleEntity);
                 }
-
                 EntityManager.SetComponentData(obstacleEntity, obstacleData);
             }
         }

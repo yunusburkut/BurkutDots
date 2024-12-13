@@ -6,8 +6,18 @@ using UnityEngine;
 public partial class FillEmptyTilesSystem : SystemBase
 {
     protected override void OnUpdate()
-{
-    // BoardState'e erişim
+    {
+    }
+
+    protected override void OnStartRunning()
+    {
+        base.OnStartRunning();
+        Enabled = false;
+    }
+
+    public void RunDetection()
+    {
+        // BoardState'e erişim
     if (!SystemAPI.TryGetSingleton<BoardState>(out var boardState))
     {
         Debug.LogError("BoardState bulunamadı. BoardInitializationSystem'in çalıştığından emin olun.");
@@ -70,9 +80,8 @@ public partial class FillEmptyTilesSystem : SystemBase
                 gridEntities[index] = newTile; // GridEntities dizisine yeni entity'yi ekle
             }
         }
+    } 
     }
-}
-
 
     private void UpdateEntityPosition(Entity entity, int col, int newRow)
     {

@@ -77,7 +77,6 @@ public partial class GroupDetectionSystem : SystemBase
             }
             group.Dispose();
         }
-        Debug.Log($"Toplam grup sayısı: {BlastableArrayCount}");
         if (BlastableArrayCount <=0)
         {
             DeadlockShuffle();
@@ -106,11 +105,11 @@ public partial class GroupDetectionSystem : SystemBase
 
             int row = currentIndex / columns;
             int col = currentIndex % columns;
-
-            TryAddNeighbor(row - 1, col, color, queue, grid, visited); // Yukarı
-            TryAddNeighbor(row + 1, col, color, queue, grid, visited); // Aşağı
-            TryAddNeighbor(row, col - 1, color, queue, grid, visited); // Sol
-            TryAddNeighbor(row, col + 1, color, queue, grid, visited); // Sağ
+            //Komşuları tara
+            TryAddNeighbor(row - 1, col, color, queue, grid, visited); 
+            TryAddNeighbor(row + 1, col, color, queue, grid, visited);
+            TryAddNeighbor(row, col - 1, color, queue, grid, visited); 
+            TryAddNeighbor(row, col + 1, color, queue, grid, visited);
         }
 
         queue.Dispose();
