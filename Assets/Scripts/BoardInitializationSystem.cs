@@ -8,13 +8,20 @@ using UnityEngine;
 public partial class BoardInitializationSystem : SystemBase
 {
     private Entity tilePrefab;
-
+    private MapSettings mapSettings;
     protected override void OnUpdate()
     {
     }
 
     protected override void OnStartRunning()
     {
+        mapSettings = Object.FindObjectOfType<MapSettings>();
+        if (!mapSettings)
+        {
+            Debug.LogError("MapSettings bileşeni sahnede bulunamadı!");
+            Enabled = false;
+            return;
+        }
         if (!SystemAPI.TryGetSingleton<TilePrefabComponent>(out var tilePrefabComponent))
         {
             UnityEngine.Debug.LogError("TilePrefabComponent bulunamadı!");
@@ -28,8 +35,10 @@ public partial class BoardInitializationSystem : SystemBase
 
     private void CreateBoard()
 {
-    int rows = 10, columns = 10, colorCount = 6;
-
+    int rows = mapSettings.M;
+    int columns = mapSettings.N;
+    int colorCount = mapSettings.K;
+    List<int2> obstaclePositionsCache = mapSettings.ObstaclePositions;
     // Grid ve GridEntities için NativeArray kullanımı
     var grid = new NativeArray<int>(rows * columns, Allocator.Persistent);
     var gridEntities = new NativeArray<Entity>(rows * columns, Allocator.Persistent);
@@ -38,12 +47,8 @@ public partial class BoardInitializationSystem : SystemBase
     SpriteArrayAuthoring colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
 
     // Engel pozisyonları
-    var obstaclePositions = new List<int2>
-    {
-        new int2(2, 2),
-        new int2(4, 5),
-        new int2(6, 7)
-    };
+    var obstaclePositions = obstaclePositionsCache;
+    
 
     for (int row = 0; row < rows; row++)
     {

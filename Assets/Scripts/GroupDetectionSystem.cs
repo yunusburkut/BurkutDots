@@ -10,7 +10,7 @@ public partial class GroupDetectionSystem : SystemBase
     {
         
     }
-
+    private MapSettings mapSettings;
     private SpriteArrayAuthoring colorSpriteManager;
     private int rows;
     private int columns;
@@ -23,7 +23,13 @@ public partial class GroupDetectionSystem : SystemBase
         {
             Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
         }
-
+        mapSettings = Object.FindObjectOfType<MapSettings>();
+        if (!mapSettings)
+        {
+            Debug.LogError("MapSettings bileşeni sahnede bulunamadı!");
+            Enabled = false;
+            return;
+        }
         Enabled = false;
     }
     
@@ -72,7 +78,7 @@ public partial class GroupDetectionSystem : SystemBase
             group.Dispose();
         }
         Debug.Log($"Toplam grup sayısı: {BlastableArrayCount}");
-        if (BlastableArrayCount < 25)
+        if (BlastableArrayCount <=0)
         {
             DeadlockShuffle();
         }
@@ -131,19 +137,19 @@ public partial class GroupDetectionSystem : SystemBase
         {
             if (mapping.ColorID == colorIndex)
             {
-                if (groupSize == 1 && mapping.Sprites.Length > 0)
+                if (groupSize < mapSettings.A && mapping.Sprites.Length > 0)
                 {
                     return mapping.Sprites[0];
                 }
-                else if (groupSize == 2 && mapping.Sprites.Length > 1)
+                else if (groupSize >= mapSettings.A && mapping.Sprites.Length > 1)
                 {
                     return mapping.Sprites[1];
                 }
-                else if (groupSize == 3 && mapping.Sprites.Length > 2)
+                else if (groupSize >= mapSettings.B && mapping.Sprites.Length > 2)
                 {
                     return mapping.Sprites[2];
                 }
-                else if (groupSize >= 4 && mapping.Sprites.Length > 3)
+                else if (groupSize >= mapSettings.C && mapping.Sprites.Length > 3)
                 {
                     return mapping.Sprites[3];
                 }

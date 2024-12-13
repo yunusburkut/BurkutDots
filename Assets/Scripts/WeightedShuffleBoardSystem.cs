@@ -10,6 +10,7 @@ public partial class WeightedShuffleBoardSystem : SystemBase
 
     // Renk ağırlıkları (örnek değerler)
     private readonly float[] colorWeights = { 1.0f, 1.5f, 2.0f, 0.5f, 1.8f, 11f };
+    private MapSettings mapSettings;
 
     protected override void OnStartRunning()
     {
@@ -18,6 +19,13 @@ public partial class WeightedShuffleBoardSystem : SystemBase
         if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
         {
             Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
+        }
+        mapSettings = Object.FindObjectOfType<MapSettings>();
+        if (!mapSettings)
+        {
+            Debug.LogError("MapSettings bileşeni sahnede bulunamadı!");
+            Enabled = false;
+            return;
         }
     }
 
@@ -46,9 +54,9 @@ public partial class WeightedShuffleBoardSystem : SystemBase
             if (grid[i] >= 0) // Boş ve engel hücreleri atla
             {
                 int color = grid[i];
-                int weightCount = Mathf.RoundToInt(colorWeights[color] * 10); // Ağırlıkları normalize etmek için çarpan
+                int weight = Mathf.RoundToInt(mapSettings.ColorWeights[color] * 10);
 
-                for (int j = 0; j < weightCount; j++)
+                for (int j = 0; j < weight; j++)
                 {
                     weightedColors.Add(color);
                 }
