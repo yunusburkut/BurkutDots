@@ -4,26 +4,28 @@ using Unity.Collections;
 using Unity.Transforms;
 using UnityEngine;
 
-
-
-public partial class BlastGroupSystem : SystemBase
+public partial class ClickValidationSystem : SystemBase
 {
     private SpriteArrayAuthoring colorSpriteManager;
 
+    protected override void OnUpdate()
+    {
+        
+    }
     protected override void OnStartRunning()
     {
         colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
+        Enabled = false;
 
         if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
         {
             Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
         }
+        Enabled = false;
     }
 
-    protected override void OnUpdate()
+    public void ProcessClick(Vector3 worldPos)
     {
-        if (!Input.GetMouseButtonDown(0)) return;
-
         if (!SystemAPI.TryGetSingleton<BoardState>(out var boardState))
         {
             Debug.LogError("BoardState bulunamadı. BoardInitializationSystem'in çalıştığından emin olun.");
@@ -35,9 +37,35 @@ public partial class BlastGroupSystem : SystemBase
         int rows = boardState.Rows;
         int columns = boardState.Columns;
 
-        // Fare pozisyonunu al ve grid pozisyonuna çevir
-        Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        // Dünya pozisyonunu grid pozisyonuna çevir
         int2 gridPosition = new int2((int)math.floor(worldPos.x), (int)math.floor(worldPos.y));
+
+        // Pozisyonun grid içinde olup olmadığını kontrol et
+        if (!IsWithinGrid(gridPosition, columns, rows))
+        {
+            Debug.Log("Tıklanan pozisyon grid dışında.");
+            return;
+        }
+
+        // Grid indexini hesapla
+        int index = gridPosition.y * columns + gridPosition.x;
+
+        // Geçersiz hücre kontrolü
+        if (grid[index] == -1 || grid[index] == -2)
+        {
+            Debug.Log("Boş veya engel tile'a tıklandı.");
+            return;
+        }
+
+        // Entity'yi al
+        Entity tileEntity = gridEntities[index];
+        if (tileEntity == Entity.Null || EntityManager.HasComponent<Moving>(tileEntity))
+        {
+            Debug.Log("Geçersiz veya hareket eden tile'a tıklandı.");
+            return;
+        }
+
+        Debug.Log($"Geçerli tile tıklandı: {gridPosition}");
 
         // Grup tespit et
         NativeList<Entity> groupEntities = FindGroupEntities(gridPosition, boardState);
@@ -54,19 +82,16 @@ public partial class BlastGroupSystem : SystemBase
                     var transform = EntityManager.GetComponentData<LocalTransform>(entity);
                     int row = (int)math.round(transform.Position.y);
                     int col = (int)math.round(transform.Position.x);
-                    int index = row * columns + col;
+                    int entityIndex = row * columns + col;
 
-                    if (index >= 0 && index < grid.Length)
-                    {
-                        grid[index] = -1; // Patlayan hücreyi boş yap
-                        gridEntities[index] = Entity.Null;
-                    }
+                    grid[entityIndex] = -1;
+                    gridEntities[entityIndex] = Entity.Null;
                 }
 
-                ecb.DestroyEntity(entity); // Patlayan entity'yi yok et
+                ecb.DestroyEntity(entity);
             }
 
-            // Obstacle canını azalt ve yok et
+            // Obstacle canını azalt ve yönet
             DecreaseObstacleHealth(grid, gridEntities, groupEntities, rows, columns, ecb);
 
             ecb.Playback(EntityManager);
@@ -74,7 +99,6 @@ public partial class BlastGroupSystem : SystemBase
         }
 
         groupEntities.Dispose();
-
         Dependency.Complete();
     }
 
@@ -84,34 +108,28 @@ public partial class BlastGroupSystem : SystemBase
         NativeQueue<int2> queue = new NativeQueue<int2>(Allocator.Temp);
         queue.Enqueue(startPos);
 
-        NativeHashSet<int2> visited = new NativeHashSet<int2>(10, Allocator.TempJob);
-        int groupColor = -1;
+        NativeHashSet<int2> visited = new NativeHashSet<int2>(boardState.Grid.Length, Allocator.TempJob);
+        int groupColor = boardState.Grid[startPos.y * boardState.Columns + startPos.x];
 
         while (queue.TryDequeue(out int2 current))
         {
-            if (visited.Contains(current))
+            if (visited.Contains(current) || !IsWithinGrid(current, boardState.Columns, boardState.Rows))
                 continue;
 
             visited.Add(current);
 
             int index = current.y * boardState.Columns + current.x;
-            if (index < 0 || index >= boardState.Grid.Length || boardState.Grid[index] < 0)
+
+            if (boardState.Grid[index] != groupColor)
                 continue;
 
-            if (groupColor == -1)
-            {
-                groupColor = boardState.Grid[index];
-            }
+            groupEntities.Add(boardState.GridEntities[index]);
 
-            if (boardState.Grid[index] == groupColor)
-            {
-                groupEntities.Add(boardState.GridEntities[index]);
-
-                queue.Enqueue(new int2(current.x + 1, current.y));
-                queue.Enqueue(new int2(current.x - 1, current.y));
-                queue.Enqueue(new int2(current.x, current.y + 1));
-                queue.Enqueue(new int2(current.x, current.y - 1));
-            }
+            // Komşuları sıraya ekle
+            queue.Enqueue(new int2(current.x + 1, current.y));
+            queue.Enqueue(new int2(current.x - 1, current.y));
+            queue.Enqueue(new int2(current.x, current.y + 1));
+            queue.Enqueue(new int2(current.x, current.y - 1));
         }
 
         visited.Dispose();
@@ -141,35 +159,31 @@ public partial class BlastGroupSystem : SystemBase
 
     private void CheckAndDecreaseObstacle(int row, int col, NativeArray<int> grid, NativeArray<Entity> gridEntities, int rows, int columns, EntityCommandBuffer ecb)
     {
-        if (row < 0 || row >= rows || col < 0 || col >= columns)
+        if (!IsWithinGrid(new int2(col, row), columns, rows))
             return;
 
         int index = row * columns + col;
 
         if (grid[index] == -2) // Obstacle kontrolü
         {
-            var obstacleEntity = gridEntities[index];
+            Entity obstacleEntity = gridEntities[index];
             if (EntityManager.HasComponent<ObstacleData>(obstacleEntity))
             {
                 var obstacleData = EntityManager.GetComponentData<ObstacleData>(obstacleEntity);
 
-                // Canı azalt
                 obstacleData.Health--;
 
                 if (obstacleData.Health <= 0)
                 {
-                    grid[index] = -1; // Engel kaldırıldı
+                    grid[index] = -1;
                     gridEntities[index] = Entity.Null;
-
-                    ecb.DestroyEntity(obstacleEntity); // Obstacle'ı yok et
+                    ecb.DestroyEntity(obstacleEntity);
                 }
-                else if (obstacleData.Health <= 1)
+                else
                 {
-                    // Sprite güncelle
                     UpdateObstacleSprite(obstacleEntity);
                 }
 
-                // ObstacleData güncelle
                 EntityManager.SetComponentData(obstacleEntity, obstacleData);
             }
         }
@@ -181,22 +195,16 @@ public partial class BlastGroupSystem : SystemBase
             return;
 
         var spriteRenderer = EntityManager.GetComponentObject<SpriteRenderer>(obstacleEntity);
+        Sprite newSprite = GetObstacleSprite();
 
-        // Maksimum cana göre hangi sprite kullanılacak hesaplanır
-        
-        if (spriteRenderer != null)
+        if (spriteRenderer != null && newSprite != null)
         {
-            Sprite newSprite = GetObstacleSprite();
-            if (newSprite != null)
-            {
-                spriteRenderer.sprite = newSprite;
-            }
+            spriteRenderer.sprite = newSprite;
         }
     }
 
     private Sprite GetObstacleSprite()
     {
-        // SpriteArrayAuthoring veya başka bir mekanizmadan sprite seç
         if (colorSpriteManager != null && colorSpriteManager.mappings.Count > 0)
         {
             return colorSpriteManager.mappings[6].Sprites[1];
@@ -204,5 +212,10 @@ public partial class BlastGroupSystem : SystemBase
 
         Debug.LogWarning("Obstacle için uygun sprite bulunamadı!");
         return null;
+    }
+
+    private bool IsWithinGrid(int2 pos, int columns, int rows)
+    {
+        return pos.x >= 0 && pos.x < columns && pos.y >= 0 && pos.y < rows;
     }
 }
