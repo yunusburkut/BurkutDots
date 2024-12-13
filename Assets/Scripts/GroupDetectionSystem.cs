@@ -14,7 +14,7 @@ public partial class GroupDetectionSystem : SystemBase
     private SpriteArrayAuthoring colorSpriteManager;
     private int rows;
     private int columns;
-
+    private int BlastableArrayCount = 0;
     protected override void OnStartRunning()
     {
         colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
@@ -26,7 +26,7 @@ public partial class GroupDetectionSystem : SystemBase
 
         Enabled = false;
     }
-
+    
     public void RunDetection()
     {
         // BoardState'e erişim
@@ -35,7 +35,7 @@ public partial class GroupDetectionSystem : SystemBase
             Debug.LogError("BoardState bulunamadı. BoardInitializationSystem'in çalıştığından emin olun.");
             return;
         }
-
+        BlastableArrayCount = 0;
         var grid = boardState.Grid;
         var gridEntities = boardState.GridEntities;
         rows = boardState.Rows;
@@ -43,7 +43,7 @@ public partial class GroupDetectionSystem : SystemBase
 
         // Ziyaret edilen hücreleri işaretlemek için geçici bir NativeArray oluşturun
         NativeArray<bool> visited = new NativeArray<bool>(grid.Length, Allocator.Temp);
-
+     
         // Grup tespiti ve sprite güncellemesi
         for (int index = 0; index < grid.Length; index++)
         {
@@ -52,20 +52,32 @@ public partial class GroupDetectionSystem : SystemBase
 
             var group = new NativeList<int>(Allocator.Temp);
             FindGroup(index, grid[index], group, grid, visited);
+            Sprite selectedSprite = GetSpriteForGroupSize(group.Length, grid[index]);
 
-            if (group.Length > 0) // Minimum grup boyutu kontrolü
+            if (group.Length > 1) // Minimum grup boyutu kontrolü
             {
-                Sprite selectedSprite = GetSpriteForGroupSize(group.Length, grid[index]);
-
+                if (selectedSprite != null)
+                {
+                    UpdateGroupSprites(group, selectedSprite, grid);
+                }
+                BlastableArrayCount++;
+            }
+            else if (group.Length <= 1)
+            {
                 if (selectedSprite != null)
                 {
                     UpdateGroupSprites(group, selectedSprite, grid);
                 }
             }
-
             group.Dispose();
         }
+        Debug.Log($"Toplam grup sayısı: {BlastableArrayCount}");
+        if (BlastableArrayCount < 25)
+        {
+            DeadlockShuffle();
+        }
 
+        
         visited.Dispose();
     }
 
@@ -169,5 +181,12 @@ public partial class GroupDetectionSystem : SystemBase
             ecb.Playback(EntityManager);
             ecb.Dispose();
         }
+    }
+
+    private void DeadlockShuffle()
+    {
+        var world = World.DefaultGameObjectInjectionWorld;
+        WeightedShuffleBoardSystem ShuffleBoardSystemz = world.GetOrCreateSystemManaged<WeightedShuffleBoardSystem>();
+        ShuffleBoardSystemz.ShuffleBoard();
     }
 }
