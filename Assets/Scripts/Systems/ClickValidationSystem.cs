@@ -2,31 +2,16 @@ using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Collections;
-using Unity.Transforms;
 using UnityEngine;
+
 [BurstCompile]
 public partial class ClickValidationSystem : SystemBase
 {
-    private SpriteArrayAuthoring colorSpriteManager;
-
-    protected override void OnUpdate()
-    {
-        
-    }
-    protected override void OnStartRunning()
-    {
-        colorSpriteManager = Object.FindFirstObjectByType<SpriteArrayAuthoring>();
-        Enabled = false;
-
-        if (colorSpriteManager == null || colorSpriteManager.mappings.Count == 0)
-        {
-            Debug.LogError("SpriteArrayAuthoring bulunamadı veya mappings boş!");
-        }
-        Enabled = false;
-    }
+    protected override void OnUpdate() { }
 
     public void ProcessClick(Vector3 worldPos)
     {
+        // BoardState'e erişim
         if (!SystemAPI.TryGetSingleton<BoardState>(out var boardState))
         {
             Debug.LogError("BoardState bulunamadı. BoardInitializationSystem'in çalıştığından emin olun.");
@@ -34,6 +19,7 @@ public partial class ClickValidationSystem : SystemBase
         }
 
         var grid = boardState.Grid;
+        var groupIDGrid = boardState.GroupIDGrid;
         var gridEntities = boardState.GridEntities;
         int rows = boardState.Rows;
         int columns = boardState.Columns;
@@ -41,178 +27,65 @@ public partial class ClickValidationSystem : SystemBase
         // Dünya pozisyonunu grid pozisyonuna çevir
         int2 gridPosition = new int2((int)math.floor(worldPos.x), (int)math.floor(worldPos.y));
 
-        // Pozisyonun grid içinde olup olmadığını kontrol et
+        // Tıklanan pozisyonun geçerliliğini kontrol et
         if (!IsWithinGrid(gridPosition, columns, rows))
         {
             Debug.Log("Tıklanan pozisyon grid dışında.");
             return;
         }
 
-        // Grid indexini hesapla
         int index = gridPosition.y * columns + gridPosition.x;
 
         // Geçersiz hücre kontrolü
-        if (grid[index] == -1 || grid[index] == -2)
+        if (grid[index] < 0)
         {
-            Debug.Log("Boş veya obstacle'a tıklandı.");
+            Debug.Log("Tıklanan hücre boş veya engel içeriyor.");
             return;
         }
 
-        // Entity'yi al
-        Entity tileEntity = gridEntities[index];
-        if (tileEntity == Entity.Null || EntityManager.HasComponent<Moving>(tileEntity))
+        int groupID = groupIDGrid[index]; // Tıklanan hücrenin GroupID'sini al
+
+        if (groupID < 0)
         {
-            Debug.Log("Geçersiz veya hareket eden tile'a tıklandı.");
             return;
         }
 
-        NativeList<Entity> groupEntities = FindGroupEntities(gridPosition, boardState);
+        var ecb = new EntityCommandBuffer(Allocator.TempJob);
 
-        if (groupEntities.Length > 1)
+        // GroupID'ye ait tüm hücreleri yok et
+        for (int i = 0; i < grid.Length; i++)
         {
-            var ecb = new EntityCommandBuffer(Allocator.TempJob);
-
-            //Grubu patlat
-            foreach (var entity in groupEntities)
+            if (groupIDGrid[i] == groupID)
             {
-                if (EntityManager.HasComponent<LocalTransform>(entity))
-                {
-                    var transform = EntityManager.GetComponentData<LocalTransform>(entity);
-                    int row = (int)math.round(transform.Position.y);
-                    int col = (int)math.round(transform.Position.x);
-                    int entityIndex = row * columns + col;
-
-                    grid[entityIndex] = -1;
-                    gridEntities[entityIndex] = Entity.Null;
-                }
-
-                ecb.DestroyEntity(entity);
+                grid[i] = -1; // Hücreyi boş yap
+                groupIDGrid[i] = -1; // GroupID'yi sıfırla
+                ecb.DestroyEntity(gridEntities[i]); // Entity'yi yok et
+                gridEntities[i] = Entity.Null;
             }
-            DecreaseObstacleHealth(grid, gridEntities, groupEntities, rows, columns, ecb);
-
-            ecb.Playback(EntityManager);
-            ecb.Dispose();
         }
+
+        // EntityCommandBuffer işlemini uygula
+        ecb.Playback(EntityManager);
+        ecb.Dispose();
+
+      
+        // FillEmptyTilesSystem'i çağır
+        TriggerFillEmptyTiles();
+    }
+
+    private void TriggerFillEmptyTiles()
+    {
         var world = World.DefaultGameObjectInjectionWorld;
-        var fillEmptyTilesSystem = world.GetOrCreateSystemManaged<FillEmptyTilesSystem>();
-        fillEmptyTilesSystem.RunDetection();//Boşlukları doldurmayı tetikliyoruz
-        groupEntities.Dispose();
-        Dependency.Complete();
-    }
+        var fillEmptyTilesSystem = world.GetExistingSystemManaged<FillEmptyTilesSystem>();
 
-    private NativeList<Entity> FindGroupEntities(int2 startPos, BoardState boardState)
-    {
-        NativeList<Entity> groupEntities = new NativeList<Entity>(Allocator.TempJob);
-        NativeQueue<int2> queue = new NativeQueue<int2>(Allocator.Temp);
-        queue.Enqueue(startPos);
-
-        NativeHashSet<int2> visited = new NativeHashSet<int2>(boardState.Grid.Length, Allocator.TempJob);
-        int groupColor = boardState.Grid[startPos.y * boardState.Columns + startPos.x];
-
-        while (queue.TryDequeue(out int2 current))
+        if (fillEmptyTilesSystem != null)
         {
-            if (visited.Contains(current) || !IsWithinGrid(current, boardState.Columns, boardState.Rows))
-                continue;
-
-            visited.Add(current);
-
-            int index = current.y * boardState.Columns + current.x;
-
-            if (boardState.Grid[index] != groupColor)
-                continue;
-            
-            Entity entity = boardState.GridEntities[index];
-            if (EntityManager.HasComponent<Moving>(entity))
-            {
-                continue; //Hareket eden entityleri grup patlatma eventine dahil etmiyoruz gridlerin boş kalmasına sebep olan bi hata yarattı
-            }
-
-            groupEntities.Add(entity);
-            queue.Enqueue(new int2(current.x + 1, current.y));
-            queue.Enqueue(new int2(current.x - 1, current.y));
-            queue.Enqueue(new int2(current.x, current.y + 1));
-            queue.Enqueue(new int2(current.x, current.y - 1));
+            fillEmptyTilesSystem.RunFill();
         }
-
-        visited.Dispose();
-        queue.Dispose();
-
-        return groupEntities;
-    }
-
-
-    private void DecreaseObstacleHealth(NativeArray<int> grid, NativeArray<Entity> gridEntities, NativeList<Entity> groupEntities, int rows, int columns, EntityCommandBuffer ecb)
-    {
-        foreach (var entity in groupEntities)
+        else
         {
-            if (!EntityManager.HasComponent<LocalTransform>(entity))
-                continue;
-
-            var transform = EntityManager.GetComponentData<LocalTransform>(entity);
-            int row = (int)math.round(transform.Position.y);
-            int col = (int)math.round(transform.Position.x);
-
-            CheckAndDecreaseObstacle(row - 1, col, grid, gridEntities, rows, columns, ecb);
-            CheckAndDecreaseObstacle(row + 1, col, grid, gridEntities, rows, columns, ecb);
-            CheckAndDecreaseObstacle(row, col - 1, grid, gridEntities, rows, columns, ecb);
-            CheckAndDecreaseObstacle(row, col + 1, grid, gridEntities, rows, columns, ecb);
+            Debug.LogError("FillEmptyTilesSystem bulunamadı!");
         }
-    }
-
-    private void CheckAndDecreaseObstacle(int row, int col, NativeArray<int> grid, NativeArray<Entity> gridEntities, int rows, int columns, EntityCommandBuffer ecb)
-    {
-        if (!IsWithinGrid(new int2(col, row), columns, rows))
-            return;
-
-        int index = row * columns + col;
-
-        if (grid[index] == -2)//Obstacle kontrolü
-        {
-            Entity obstacleEntity = gridEntities[index];
-            if (EntityManager.HasComponent<ObstacleData>(obstacleEntity))
-            {
-                var obstacleData = EntityManager.GetComponentData<ObstacleData>(obstacleEntity);
-
-                obstacleData.Health--;
-
-                if (obstacleData.Health <= 0)
-                {
-                    grid[index] = -1;
-                    gridEntities[index] = Entity.Null;
-                    ecb.DestroyEntity(obstacleEntity);
-                }
-                else
-                {
-                    UpdateObstacleSprite(obstacleEntity);
-                }
-                EntityManager.SetComponentData(obstacleEntity, obstacleData);
-            }
-        }
-    }
-
-    private void UpdateObstacleSprite(Entity obstacleEntity)
-    {
-        if (!EntityManager.HasComponent<SpriteRenderer>(obstacleEntity))
-            return;
-
-        var spriteRenderer = EntityManager.GetComponentObject<SpriteRenderer>(obstacleEntity);
-        Sprite newSprite = GetObstacleSprite();
-
-        if (spriteRenderer != null && newSprite != null)
-        {
-            spriteRenderer.sprite = newSprite;
-        }
-    }
-
-    private Sprite GetObstacleSprite()
-    {
-        if (colorSpriteManager != null && colorSpriteManager.mappings.Count > 0)
-        {
-            return colorSpriteManager.mappings[6].Sprites[1];
-        }
-
-        Debug.LogWarning("Obstacle için uygun sprite bulunamadı!");
-        return null;
     }
 
     private bool IsWithinGrid(int2 pos, int columns, int rows)

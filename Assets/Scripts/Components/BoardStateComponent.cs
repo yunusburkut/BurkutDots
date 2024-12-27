@@ -1,10 +1,11 @@
-using Unity.Entities;
 using Unity.Collections;
+using Unity.Entities;
 
 public struct BoardState : IComponentData
 {
-    public int Rows; // Gridin satır sayısı
-    public int Columns; // Gridin sütun sayısı
-    public NativeArray<int> Grid; // Hücre durumlarını tutar (-1: boş, -2: obstacle, >= 0: tile)
-    public NativeArray<Entity> GridEntities; // Her hücredeki Entity'leri tutar
+    public int Rows;
+    public int Columns;
+    public NativeArray<int> Grid; // Hücre durumları
+    public NativeArray<int> GroupIDGrid; // GroupID'leri tutar
+    public NativeArray<Entity> GridEntities;
 }
